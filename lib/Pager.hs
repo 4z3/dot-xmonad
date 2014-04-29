@@ -26,10 +26,12 @@ data PagerConfig = PagerConfig
     -- , p_cellpadding :: Dimension
     , p_borderwidth :: Dimension
     , p_bordercolor :: String
+    , p_prefixcolor :: Maybe String
+    , p_suffixcolor :: Maybe String
     }
 
 
-defaultPagerConfig = PagerConfig "xft:Sans-8" 100 30 2 "white"
+defaultPagerConfig = PagerConfig "xft:Sans-8" 100 30 2 "white" Nothing Nothing
 
 
 data PagerState = PagerState
@@ -96,6 +98,8 @@ redraw c p = do
         h   = p_cellheight c
         bw  = p_borderwidth c
         bc  = p_bordercolor c
+        pc  = p_prefixcolor c
+        sc  = p_suffixcolor c
 
     let currentTag = tag $ workspace $ current ss
     let hiddenTags = map tag $ hidden ss
@@ -107,9 +111,7 @@ redraw c p = do
 
             (bg, fg) <- colorizer (search p) currentTag tag
 
-            let cpfx = commonPrefix tag (search p)
-
-            my_paintAndWrite win (pagerXMF p) w h bw bg bc fg bg [AlignCenter] [tag] cpfx "red"
+            my_paintAndWrite win (pagerXMF p) w h bw bg bc fg bg [AlignCenter] [tag] (search p) pc sc
             )
 
 
@@ -188,14 +190,15 @@ my_paintAndWrite :: Window     -- ^ The window where to draw
               -> [Align]    -- ^ String 'Align'ments
               -> [String]   -- ^ Strings to be printed
               -> String     -- ^----TODO
-              -> String     -- ^----TODO
+              -> Maybe String     -- ^----TODO
+              -> Maybe String     -- ^----TODO
               -> X ()
-my_paintAndWrite w fs wh ht bw bc borc ffc fbc als strs prefixStr prefixColor = do
+my_paintAndWrite w fs wh ht bw bc borc ffc fbc als strs searchInput mbPfxColor mbSfxColor = do
     d <- asks display
     strPositions <- forM (zip als strs) $ \(al, str) ->
         stringPosition d fs (Rectangle 0 0 wh ht) al str
     let ms = Just (fs,ffc,fbc, zip strs strPositions)
-    my_paintWindow' w (Rectangle 0 0 wh ht) bw bc borc ms Nothing prefixStr prefixColor
+    my_paintWindow' w (Rectangle 0 0 wh ht) bw bc borc ms Nothing searchInput mbPfxColor mbSfxColor
 
 -- | Paints a titlebar with some strings and icons
 -- drawn inside it.
@@ -203,10 +206,11 @@ my_paintAndWrite w fs wh ht bw bc borc ffc fbc als strs prefixStr prefixColor = 
 my_paintWindow' :: Window -> Rectangle -> Dimension -> String -> String
                 -> Maybe (XMonadFont,String,String,[(String, (Position, Position))])
                 -> Maybe (String, String, [((Position, Position), [[Bool]])])
-                -> String     -- ^----TODO
-                -> String     -- ^----TODO
+                -> String           -- ^----TODO
+                -> Maybe String     -- ^----TODO
+                -> Maybe String     -- ^----TODO
                 -> X ()
-my_paintWindow' win (Rectangle _ _ wh ht) bw color b_color strStuff iconStuff prefixStr prefixColor = do
+my_paintWindow' win (Rectangle _ _ wh ht) bw color b_color strStuff iconStuff searchInput mbPfxColor mbSfxColor = do
   d  <- asks display
   p  <- io $ createPixmap d win wh ht (defaultDepthOfScreen $ defaultScreenOfDisplay d)
   gc <- io $ createGC d p
@@ -224,7 +228,18 @@ my_paintWindow' win (Rectangle _ _ wh ht) bw color b_color strStuff iconStuff pr
     let (xmf,fc,bc,strAndPos) = fromJust strStuff
     forM_ strAndPos $ \(s, (x, y)) -> do
         printStringXMF d p xmf gc fc bc x y s
-        printStringXMF d p xmf gc prefixColor bc x y prefixStr
+
+        let pfx = commonPrefix s searchInput
+            sfx = drop (length pfx) searchInput
+
+        pfx_width <- textWidthXMF d xmf pfx
+
+        when (isJust mbPfxColor) $ do
+            printStringXMF d p xmf gc (fromJust mbPfxColor) bc x y pfx
+
+        when (isJust mbSfxColor) $ do
+            printStringXMF d p xmf gc (fromJust mbSfxColor) bc (x + (fromIntegral pfx_width)) y sfx
+
   -- paint icons
   when (isJust iconStuff) $ do
     let (fc, bc, iconAndPos) = fromJust iconStuff
