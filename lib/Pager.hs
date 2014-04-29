@@ -60,7 +60,7 @@ pagerMode c p = do
     ss <- gets windowset
 
     case match (search p) (map tag $ hidden ss) of
-        Just i -> removePager p >> windows (greedyView i)
+        Just i -> removePager p >> windows (view i)
         Nothing -> do
             redraw c p
             submapDefault (failbeep >> pagerMode c p) . fromList $
