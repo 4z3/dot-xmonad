@@ -42,6 +42,7 @@ data PagerState = PagerState
     { pagerWindows  :: [Window]
     , search        :: String
     , pagerXMF      :: XMonadFont
+    , pagerFocus    :: (Position, Position)
     }
 
 
@@ -78,10 +79,21 @@ pagerMode viewFunc c p = do
                         [ ((0, xK_BackSpace ), incSearchPopChar p >>= pagerMode viewFunc c)
                         , ((0, xK_Escape    ), removePager p)
                         , ((0, xK_Menu      ), removePager p)
+                        , ((0, xK_Left      ), moveFocus (-1, 0) p >>= pagerMode viewFunc c)
+                        , ((0, xK_Right     ), moveFocus ( 1, 0) p >>= pagerMode viewFunc c)
+                        , ((0, xK_Up        ), moveFocus ( 0,-1) p >>= pagerMode viewFunc c)
+                        , ((0, xK_Down      ), moveFocus ( 0, 1) p >>= pagerMode viewFunc c)
                         ]
 
+
 failbeep = spawn "beep -l 100 -f 500"
-    
+
+
+moveFocus :: (Position, Position) -> PagerState -> X PagerState
+moveFocus (dx, dy) p = do
+    let (x, y) = pagerFocus p
+    return p { pagerFocus = (x + dx, y + dy) }
+
 
 incSearchPushChar c p = return p { search = search p ++ [c] }
 
@@ -109,12 +121,15 @@ redraw c p = do
 
     let wsTags = hiddenTags ++ [currentTag]
 
-    forM_ (zip3 [1..] wsTags $ pagerWindows p)
-          (\(i, tag, win) -> do
+    forM_ (zip4 [1..] wsTags (pagerWindows p) wave)
+          (\(i, tag, win, pos) -> do
 
-            (bg, fg) <- if isXOf (p_matchmethod c) (search p) tag
-                            then colorizer c (search p) currentTag tag
-                            else return $ p_uncolor c
+            (bg, fg) <- if pos == pagerFocus p
+                            then defaultColorizer tag True
+                            else
+                                if isXOf (p_matchmethod c) (search p) tag
+                                    then colorizer c (search p) currentTag tag
+                                    else return $ p_uncolor c
 
             let matchStuff = if tag == currentTag
                                  then Nothing
@@ -152,11 +167,11 @@ newPager c = do
 
     showWindows pws
 
-    return $ PagerState pws "" fn
+    return $ PagerState pws "" fn (0,0)
 
 
 removePager :: PagerState -> X ()
-removePager (PagerState pws _ fn) = do
+removePager (PagerState pws _ fn _) = do
     releaseXMF fn
     deleteWindows pws
 
