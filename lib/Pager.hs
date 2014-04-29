@@ -83,6 +83,7 @@ pagerMode viewFunc c p = do
                         , ((0, xK_Right     ), moveFocus ( 1, 0) p >>= pagerMode viewFunc c)
                         , ((0, xK_Up        ), moveFocus ( 0,-1) p >>= pagerMode viewFunc c)
                         , ((0, xK_Down      ), moveFocus ( 0, 1) p >>= pagerMode viewFunc c)
+                        , ((0, xK_Return    ), removePager p >> selectFocused p >>= windows . viewFunc)
                         ]
 
 
@@ -100,11 +101,26 @@ moveFocus (dx, dy) p = do
         else failbeep >> return p
 
 
+selectFocused :: PagerState -> X WorkspaceId
+selectFocused p = do
+    ss <- gets windowset
+
+    let currentTag = tag $ workspace $ current ss
+    let hiddenTags = map tag $ hidden ss
+
+    let wsTags = hiddenTags ++ [currentTag]
+
+    -- TODO the pager must never "focus" something inexistent
+    return $ fromJust $ lookup (pagerFocus p) $ zip wave wsTags
+
+
 incSearchPushChar c p = return p { search = search p ++ [c] }
+
 
 -- only rubout if we have at least one char
 incSearchPopChar p@PagerState{search=xs@(_:_)} = return p { search = init xs }
 incSearchPopChar p = return p
+
 
 data TagState = Current | Candidate | Other
     deriving (Eq)
