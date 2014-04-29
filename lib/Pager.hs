@@ -28,10 +28,11 @@ data PagerConfig = PagerConfig
     , p_bordercolor :: String
     , p_prefixcolor :: Maybe String
     , p_suffixcolor :: Maybe String
+    , p_uncolor     :: (String, String) -- ^ color of unavailable cells (background, foreground)
     }
 
 
-defaultPagerConfig = PagerConfig "xft:Sans-8" 100 30 2 "white" Nothing Nothing
+defaultPagerConfig = PagerConfig "xft:Sans-8" 100 30 2 "white" Nothing Nothing ("#232323", "#424242")
 
 
 data PagerState = PagerState
@@ -109,7 +110,7 @@ redraw c p = do
     forM_ (zip wsTags $ pagerWindows p)
           (\(tag, win) -> do
 
-            (bg, fg) <- colorizer (search p) currentTag tag
+            (bg, fg) <- colorizer c (search p) currentTag tag
 
             my_paintAndWrite win (pagerXMF p) w h bw bg bc fg bg [AlignCenter] [tag] (search p) pc sc
             )
@@ -137,7 +138,7 @@ newPager c = do
 
     pws <- zipWithM
             (\ tag (ox, oy) -> do
-                (bg, fg) <- colorizer "" currentTag tag
+                (bg, fg) <- colorizer c "" currentTag tag
                 createNewWindow (Rectangle (x + ox * dx) (y + oy * dy) w h) Nothing bg True)
             wsTags
             wave
@@ -159,9 +160,10 @@ tagState searchInput currentTag t
     | otherwise = Other
 
 
-colorizer searchInput currentTag tag =
+colorizer :: PagerConfig -> String -> String -> String -> X (String, String)
+colorizer c searchInput currentTag tag =
     case tagState searchInput currentTag tag of
-        Current     -> return ("#030303", "#0f0f0f")
+        Current     -> return $ p_uncolor c
         Candidate   -> defaultColorizer tag True
         _           -> defaultColorizer tag False
 
