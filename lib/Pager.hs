@@ -92,7 +92,12 @@ failbeep = spawn "beep -l 100 -f 500"
 moveFocus :: (Position, Position) -> PagerState -> X PagerState
 moveFocus (dx, dy) p = do
     let (x, y) = pagerFocus p
-    return p { pagerFocus = (x + dx, y + dy) }
+        focus' = (x + dx, y + dy)
+        reachableCoords = take (length $ pagerWindows p) wave
+
+    if elem focus' reachableCoords
+        then return p { pagerFocus = focus' }
+        else failbeep >> return p
 
 
 incSearchPushChar c p = return p { search = search p ++ [c] }
