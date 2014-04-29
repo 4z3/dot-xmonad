@@ -2,6 +2,7 @@ module Pager
     ( pager
     , defaultPagerConfig
     , PagerConfig(..)
+    , PagerMatch(..)
     ) where
 
 import Control.Monad ( forM, forM_, when, zipWithM )
@@ -18,6 +19,7 @@ import XMonad.Util.XUtils
 
 import Debunk
 
+data PagerMatch = PagerMatchInfix | PagerMatchPrefix
 
 data PagerConfig = PagerConfig
     { p_font        :: String
@@ -26,13 +28,14 @@ data PagerConfig = PagerConfig
     -- , p_cellpadding :: Dimension
     , p_borderwidth :: Dimension
     , p_bordercolor :: String
-    , p_prefixcolor :: Maybe String
-    , p_suffixcolor :: Maybe String
+    , p_matchcolor  :: String
+    , p_matchmethod :: PagerMatch
     , p_uncolor     :: (String, String) -- ^ color of current (unavailable) cell (background, foreground)
     }
 
 
-defaultPagerConfig = PagerConfig "xft:Sans-8" 100 30 2 "white" Nothing Nothing ("#232323", "#424242")
+
+defaultPagerConfig = PagerConfig "xft:Sans-8" 100 30 2 "white" "magenta" PagerMatchInfix ("#232323", "#424242")
 
 
 data PagerState = PagerState
@@ -42,9 +45,9 @@ data PagerState = PagerState
     }
 
 
-match :: String -> [String] -> Maybe String
-match s ws = do
-    let cands = filter (isPrefixOf s) ws
+match :: PagerMatch -> String -> [String] -> Maybe String
+match m s ws = do
+    let cands = filter (isXOf m s) ws
     if length cands == 1
         then Just $ head cands
         else Nothing
@@ -59,7 +62,7 @@ pagerMode c p = do
 
     ss <- gets windowset
 
-    case match (search p) (map tag $ hidden ss) of
+    case match (p_matchmethod c) (search p) (map tag $ hidden ss) of
         Just i -> removePager p >> windows (view i)
         Nothing -> do
             redraw c p
@@ -99,25 +102,25 @@ redraw c p = do
         h   = p_cellheight c
         bw  = p_borderwidth c
         bc  = p_bordercolor c
-        pc  = p_prefixcolor c
-        sc  = p_suffixcolor c
+        mc  = p_matchcolor c
 
     let currentTag = tag $ workspace $ current ss
     let hiddenTags = map tag $ hidden ss
 
     let wsTags = hiddenTags ++ [currentTag]
 
-    forM_ (zip wsTags $ pagerWindows p)
-          (\(tag, win) -> do
+    forM_ (zip3 [1..] wsTags $ pagerWindows p)
+          (\(i, tag, win) -> do
 
-            (bg, fg) <- colorizer c (search p) currentTag tag
+            (bg, fg) <- if isXOf (p_matchmethod c) (search p) tag
+                            then colorizer c (search p) currentTag tag
+                            else return $ p_uncolor c
 
-            let xfix = if tag == currentTag
-                           then Nothing
-                           else Just (search p, pc, sc)
+            let matchStuff = if tag == currentTag
+                                 then Nothing
+                                 else Just (p_matchmethod c, search p, mc)
 
-            my_paintAndWrite win (pagerXMF p) w h bw bg bc fg bg [AlignCenter] [tag] xfix
-            )
+            my_paintAndWrite win (pagerXMF p) w h bw bg bc fg bg [AlignCenter] [tag] matchStuff)
 
 
 newPager :: PagerConfig -> X PagerState
@@ -168,7 +171,7 @@ colorizer :: PagerConfig -> String -> String -> String -> X (String, String)
 colorizer c searchInput currentTag tag =
     case tagState searchInput currentTag tag of
         Current     -> return $ p_uncolor c
-        Candidate   -> defaultColorizer tag True
+        --Candidate   -> defaultColorizer tag True
         _           -> defaultColorizer tag False
 
 
@@ -185,24 +188,24 @@ wave = zip (0:(concat $ map (\i -> [0..i]++[i-1,i-2..1] ++ [0,-1..(-i)]++[-i,-i+
 -- | Fill a window with a rectangle and a border, and write
 -- | a number of strings to given positions
 my_paintAndWrite :: Window     -- ^ The window where to draw
-              -> XMonadFont -- ^ XMonad Font for drawing
-              -> Dimension  -- ^ Window width
-              -> Dimension  -- ^ Window height
-              -> Dimension  -- ^ Border width
-              -> String     -- ^ Window background color
-              -> String     -- ^ Border color
-              -> String     -- ^ String color
-              -> String     -- ^ String background color
-              -> [Align]    -- ^ String 'Align'ments
-              -> [String]   -- ^ Strings to be printed
-              -> Maybe (String, Maybe String, Maybe String) -- ^ TODO
-              -> X ()
-my_paintAndWrite w fs wh ht bw bc borc ffc fbc als strs xfix = do
+                -> XMonadFont -- ^ XMonad Font for drawing
+                -> Dimension  -- ^ Window width
+                -> Dimension  -- ^ Window height
+                -> Dimension  -- ^ Border width
+                -> String     -- ^ Window background color
+                -> String     -- ^ Border color
+                -> String     -- ^ String color
+                -> String     -- ^ String background color
+                -> [Align]    -- ^ String 'Align'ments
+                -> [String]   -- ^ Strings to be printed
+                -> Maybe (PagerMatch, String, String) -- ^ TODO
+                -> X ()
+my_paintAndWrite w fs wh ht bw bc borc ffc fbc als strs matchStuff = do
     d <- asks display
     strPositions <- forM (zip als strs) $ \(al, str) ->
         stringPosition d fs (Rectangle 0 0 wh ht) al str
     let ms = Just (fs,ffc,fbc, zip strs strPositions)
-    my_paintWindow' w (Rectangle 0 0 wh ht) bw bc borc ms Nothing xfix
+    my_paintWindow' w (Rectangle 0 0 wh ht) bw bc borc ms Nothing matchStuff
 
 -- | Paints a titlebar with some strings and icons
 -- drawn inside it.
@@ -210,9 +213,9 @@ my_paintAndWrite w fs wh ht bw bc borc ffc fbc als strs xfix = do
 my_paintWindow' :: Window -> Rectangle -> Dimension -> String -> String
                 -> Maybe (XMonadFont,String,String,[(String, (Position, Position))])
                 -> Maybe (String, String, [((Position, Position), [[Bool]])])
-                -> Maybe (String, Maybe String, Maybe String) -- ^ TODO
+                -> Maybe (PagerMatch, String, String) -- ^ TODO
                 -> X ()
-my_paintWindow' win (Rectangle _ _ wh ht) bw color b_color strStuff iconStuff xfix = do
+my_paintWindow' win (Rectangle _ _ wh ht) bw color b_color strStuff iconStuff matchStuff = do
   d  <- asks display
   p  <- io $ createPixmap d win wh ht (defaultDepthOfScreen $ defaultScreenOfDisplay d)
   gc <- io $ createGC d p
@@ -231,18 +234,14 @@ my_paintWindow' win (Rectangle _ _ wh ht) bw color b_color strStuff iconStuff xf
     forM_ strAndPos $ \(s, (x, y)) -> do
         printStringXMF d p xmf gc fc bc x y s
 
-        when (isJust xfix) $ do
-            let Just (searchInput, mbPfxColor, mbSfxColor) = xfix
-                pfx = commonPrefix s searchInput
-                sfx = drop (length pfx) $ take (length s) searchInput
+        when (isJust matchStuff) $ do
+            let Just (matchMethod, searchInput, matchColor) = matchStuff
+                mbi = findXIndex matchMethod searchInput s
+            when (isJust mbi) $ do
+                let i = fromJust mbi
+                skip_width <- textWidthXMF d xmf (take i s)
 
-            pfx_width <- textWidthXMF d xmf pfx
-
-            when (isJust mbPfxColor) $ do
-                printStringXMF d p xmf gc (fromJust mbPfxColor) bc x y pfx
-
-            when (isJust mbSfxColor) $ do
-                printStringXMF d p xmf gc (fromJust mbSfxColor) bc (x + (fromIntegral pfx_width)) y sfx
+                printStringXMF d p xmf gc matchColor bc (x + fromIntegral skip_width) y searchInput
 
   -- paint icons
   when (isJust iconStuff) $ do
@@ -258,3 +257,26 @@ my_paintWindow' win (Rectangle _ _ wh ht) bw color b_color strStuff iconStuff xf
 
 commonPrefix (x:xs) (y:ys) | x == y = x:commonPrefix xs ys
 commonPrefix _ _ = [] 
+
+
+isXOf :: PagerMatch -> String -> String -> Bool
+isXOf PagerMatchInfix  = isInfixOf
+isXOf PagerMatchPrefix = isPrefixOf
+
+
+findXIndex :: (Eq a) => PagerMatch -> [a] -> [a] -> Maybe Int
+findXIndex PagerMatchInfix  = findInfixIndex
+findXIndex PagerMatchPrefix = findPrefixIndex
+
+
+findInfixIndex :: (Eq a) => [a] -> [a] -> Maybe Int
+findInfixIndex needle haystack
+    = (\x -> if null x then Nothing else Just (fst $ head x))
+      . dropWhile (\(_,x) -> not $ isPrefixOf needle x)
+        $ zip [0..] (tails haystack)
+
+findPrefixIndex :: (Eq a) => [a] -> [a] -> Maybe Int
+findPrefixIndex needle haystack =
+    if isPrefixOf needle haystack
+        then Just 0
+        else Nothing
