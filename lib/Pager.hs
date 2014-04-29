@@ -53,29 +53,29 @@ match m s ws = do
         else Nothing
 
 
-pager :: PagerConfig -> X ()
-pager c = newPager c >>= pagerMode c
+pager :: PagerConfig -> (WorkspaceId -> WindowSet -> WindowSet) -> X ()
+pager c viewFunc = newPager c >>= pagerMode viewFunc c
 
 
-pagerMode :: PagerConfig -> PagerState -> X ()
-pagerMode c p = do
+pagerMode :: (WorkspaceId -> WindowSet -> WindowSet) -> PagerConfig -> PagerState -> X ()
+pagerMode viewFunc c p = do
 
     ss <- gets windowset
 
     case match (p_matchmethod c) (search p) (map tag $ hidden ss) of
-        Just i -> removePager p >> windows (view i)
+        Just i -> removePager p >> windows (viewFunc i)
         Nothing -> do
             redraw c p
-            submapDefault (failbeep >> pagerMode c p) . fromList $
-                        zipWith (\ k chr -> ((0, k), incSearchPushChar chr p >>= pagerMode c))
+            submapDefault (failbeep >> pagerMode viewFunc c p) . fromList $
+                        zipWith (\ k chr -> ((0, k), incSearchPushChar chr p >>= pagerMode viewFunc c))
                                 ([xK_0..xK_9] ++ [xK_a..xK_z] ++ [xK_space])
                                 (['0' .. '9'] ++ ['a' .. 'z'] ++ [' '])
                         ++
-                        zipWith (\ k chr -> ((shiftMask, k), incSearchPushChar chr p >>= pagerMode c))
+                        zipWith (\ k chr -> ((shiftMask, k), incSearchPushChar chr p >>= pagerMode viewFunc c))
                                 [xK_a..xK_z]
                                 ['A'..'Z']
                         ++
-                        [ ((0, xK_BackSpace ), incSearchPopChar p >>= pagerMode c)
+                        [ ((0, xK_BackSpace ), incSearchPopChar p >>= pagerMode viewFunc c)
                         , ((0, xK_Escape    ), removePager p)
                         , ((0, xK_Menu      ), removePager p)
                         ]
