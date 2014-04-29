@@ -234,7 +234,7 @@ my_paintWindow' win (Rectangle _ _ wh ht) bw color b_color strStuff iconStuff xf
         when (isJust xfix) $ do
             let Just (searchInput, mbPfxColor, mbSfxColor) = xfix
                 pfx = commonPrefix s searchInput
-                sfx = drop (length pfx) searchInput
+                sfx = drop (length pfx) $ take (length s) searchInput
 
             pfx_width <- textWidthXMF d xmf pfx
 
