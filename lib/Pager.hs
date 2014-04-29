@@ -112,7 +112,11 @@ redraw c p = do
 
             (bg, fg) <- colorizer c (search p) currentTag tag
 
-            my_paintAndWrite win (pagerXMF p) w h bw bg bc fg bg [AlignCenter] [tag] (search p) pc sc
+            let xfix = if tag == currentTag
+                           then Nothing
+                           else Just (search p, pc, sc)
+
+            my_paintAndWrite win (pagerXMF p) w h bw bg bc fg bg [AlignCenter] [tag] xfix
             )
 
 
@@ -191,16 +195,14 @@ my_paintAndWrite :: Window     -- ^ The window where to draw
               -> String     -- ^ String background color
               -> [Align]    -- ^ String 'Align'ments
               -> [String]   -- ^ Strings to be printed
-              -> String     -- ^----TODO
-              -> Maybe String     -- ^----TODO
-              -> Maybe String     -- ^----TODO
+              -> Maybe (String, Maybe String, Maybe String) -- ^ TODO
               -> X ()
-my_paintAndWrite w fs wh ht bw bc borc ffc fbc als strs searchInput mbPfxColor mbSfxColor = do
+my_paintAndWrite w fs wh ht bw bc borc ffc fbc als strs xfix = do
     d <- asks display
     strPositions <- forM (zip als strs) $ \(al, str) ->
         stringPosition d fs (Rectangle 0 0 wh ht) al str
     let ms = Just (fs,ffc,fbc, zip strs strPositions)
-    my_paintWindow' w (Rectangle 0 0 wh ht) bw bc borc ms Nothing searchInput mbPfxColor mbSfxColor
+    my_paintWindow' w (Rectangle 0 0 wh ht) bw bc borc ms Nothing xfix
 
 -- | Paints a titlebar with some strings and icons
 -- drawn inside it.
@@ -208,11 +210,9 @@ my_paintAndWrite w fs wh ht bw bc borc ffc fbc als strs searchInput mbPfxColor m
 my_paintWindow' :: Window -> Rectangle -> Dimension -> String -> String
                 -> Maybe (XMonadFont,String,String,[(String, (Position, Position))])
                 -> Maybe (String, String, [((Position, Position), [[Bool]])])
-                -> String           -- ^----TODO
-                -> Maybe String     -- ^----TODO
-                -> Maybe String     -- ^----TODO
+                -> Maybe (String, Maybe String, Maybe String) -- ^ TODO
                 -> X ()
-my_paintWindow' win (Rectangle _ _ wh ht) bw color b_color strStuff iconStuff searchInput mbPfxColor mbSfxColor = do
+my_paintWindow' win (Rectangle _ _ wh ht) bw color b_color strStuff iconStuff xfix = do
   d  <- asks display
   p  <- io $ createPixmap d win wh ht (defaultDepthOfScreen $ defaultScreenOfDisplay d)
   gc <- io $ createGC d p
@@ -231,16 +231,18 @@ my_paintWindow' win (Rectangle _ _ wh ht) bw color b_color strStuff iconStuff se
     forM_ strAndPos $ \(s, (x, y)) -> do
         printStringXMF d p xmf gc fc bc x y s
 
-        let pfx = commonPrefix s searchInput
-            sfx = drop (length pfx) searchInput
+        when (isJust xfix) $ do
+            let Just (searchInput, mbPfxColor, mbSfxColor) = xfix
+                pfx = commonPrefix s searchInput
+                sfx = drop (length pfx) searchInput
 
-        pfx_width <- textWidthXMF d xmf pfx
+            pfx_width <- textWidthXMF d xmf pfx
 
-        when (isJust mbPfxColor) $ do
-            printStringXMF d p xmf gc (fromJust mbPfxColor) bc x y pfx
+            when (isJust mbPfxColor) $ do
+                printStringXMF d p xmf gc (fromJust mbPfxColor) bc x y pfx
 
-        when (isJust mbSfxColor) $ do
-            printStringXMF d p xmf gc (fromJust mbSfxColor) bc (x + (fromIntegral pfx_width)) y sfx
+            when (isJust mbSfxColor) $ do
+                printStringXMF d p xmf gc (fromJust mbSfxColor) bc (x + (fromIntegral pfx_width)) y sfx
 
   -- paint icons
   when (isJust iconStuff) $ do
