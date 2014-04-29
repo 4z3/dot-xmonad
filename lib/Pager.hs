@@ -28,7 +28,7 @@ data PagerConfig = PagerConfig
     , p_bordercolor :: String
     , p_prefixcolor :: Maybe String
     , p_suffixcolor :: Maybe String
-    , p_uncolor     :: (String, String) -- ^ color of unavailable cells (background, foreground)
+    , p_uncolor     :: (String, String) -- ^ color of current (unavailable) cell (background, foreground)
     }
 
 
