@@ -4,20 +4,17 @@ module Pager
     , PagerConfig(..)
     ) where
 
-import qualified Data.Map as M
 import Control.Monad ( forM, forM_, when, zipWithM )
-import XMonad
-import XMonad.StackSet hiding ( filter )
-import qualified XMonad.StackSet as W
-import XMonad.Util.Font
-import XMonad.Util.XUtils
-import XMonad.Util.Image ( drawIcon )
-import XMonad.Actions.Submap
 import Data.List
-
+import Data.Map ( fromList )
 import Data.Maybe ( isJust, fromJust )
-
+import XMonad
 import XMonad.Actions.GridSelect ( defaultColorizer )
+import XMonad.Actions.Submap
+import XMonad.StackSet hiding ( filter )
+import XMonad.Util.Font
+import XMonad.Util.Image ( drawIcon )
+import XMonad.Util.XUtils
 
 import Debunk
 
@@ -63,7 +60,7 @@ pagerMode c p = do
         Just i -> removePager p >> windows (greedyView i)
         Nothing -> do
             redraw c p
-            submapDefault (failbeep >> pagerMode c p) . M.fromList $
+            submapDefault (failbeep >> pagerMode c p) . fromList $
                         zipWith (\ k chr -> ((0, k), incSearchPushChar chr p >>= pagerMode c))
                                 ([xK_0..xK_9] ++ [xK_a..xK_z] ++ [xK_space])
                                 (['0' .. '9'] ++ ['a' .. 'z'] ++ [' '])
