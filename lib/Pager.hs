@@ -62,7 +62,7 @@ pager c viewFunc as = newPager c as >>= pagerMode viewFunc c
 
 pagerMode :: (String -> X ()) -> PagerConfig -> PagerState -> X ()
 pagerMode viewFunc c p = do
-    case match (p_matchmethod c) (search p) (strings p) of
+    case match (p_matchmethod c) (search p) (init $ strings p) of
         Just i -> removePager p >> viewFunc i
         Nothing -> do
             redraw c p
