@@ -7,6 +7,7 @@ module Pager
 
 import Control.Monad ( forM, forM_, when, zipWithM )
 import Data.List
+import Data.Ord
 import Data.Map ( fromList )
 import Data.Maybe ( isJust, fromJust )
 import XMonad
@@ -99,6 +100,30 @@ moveFocus (dx, dy) p = do
     if elem focus' reachableCoords
         then return p { pagerFocus = focus' }
         else failbeep >> return p
+
+
+wrapFocus :: (Position, Position) -> PagerState -> X PagerState
+wrapFocus (0, dy) p = do
+    let (x, y) = pagerFocus p
+        reachableCoords = take (length $ pagerWindows p) wave
+
+    let xcolumn = sortBy (comparing snd) $ filter ((==)x.fst) reachableCoords
+
+    let focus' = xcolumn !! ((fromIntegral (fromJust (findIndex ((==)(x, y)) xcolumn)) + fromIntegral dy) `mod` length xcolumn)
+    return p { pagerFocus = focus' }
+
+
+wrapFocus (dx, 0) p = do
+    let (x, y) = pagerFocus p
+        reachableCoords = take (length $ pagerWindows p) wave
+
+    let ycolumn = sortBy (comparing fst) $ filter ((==)y.snd) reachableCoords
+
+    let focus' = ycolumn !! ((fromIntegral (fromJust (findIndex ((==)(x, y)) ycolumn)) + fromIntegral dx) `mod` length ycolumn)
+    return p { pagerFocus = focus' }
+
+
+wrapFocus _ p = failbeep >> return p
 
 
 selectFocused :: PagerState -> X WorkspaceId
