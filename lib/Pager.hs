@@ -33,11 +33,12 @@ data PagerConfig = PagerConfig
     , p_matchcolor  :: String
     , p_matchmethod :: PagerMatch
     , p_uncolor     :: (String, String) -- ^ color of current (unavailable) cell (background, foreground)
+    , p_wrap        :: Bool
     }
 
 
 
-defaultPagerConfig = PagerConfig "xft:Sans-8" 100 30 2 "white" "magenta" PagerMatchInfix ("#232323", "#424242")
+defaultPagerConfig = PagerConfig "xft:Sans-8" 100 30 2 "white" "magenta" PagerMatchInfix ("#232323", "#424242") True
 
 
 data PagerState = PagerState
@@ -78,15 +79,20 @@ pagerMode viewFunc c p = do
                         [ ((0, xK_BackSpace ), incSearchPopChar p >>= pagerMode viewFunc c)
                         , ((0, xK_Escape    ), removePager p)
                         , ((0, xK_Menu      ), removePager p)
-                        , ((0, xK_Left      ), moveFocus (-1, 0) p >>= pagerMode viewFunc c)
-                        , ((0, xK_Right     ), moveFocus ( 1, 0) p >>= pagerMode viewFunc c)
-                        , ((0, xK_Up        ), moveFocus ( 0,-1) p >>= pagerMode viewFunc c)
-                        , ((0, xK_Down      ), moveFocus ( 0, 1) p >>= pagerMode viewFunc c)
+                        , ((0, xK_Left      ), goto c (-1, 0) p >>= pagerMode viewFunc c)
+                        , ((0, xK_Right     ), goto c ( 1, 0) p >>= pagerMode viewFunc c)
+                        , ((0, xK_Up        ), goto c ( 0,-1) p >>= pagerMode viewFunc c)
+                        , ((0, xK_Down      ), goto c ( 0, 1) p >>= pagerMode viewFunc c)
                         , ((0, xK_Return    ), removePager p >> return (selectFocused p) >>= viewFunc)
                         ]
 
 
 failbeep = spawn "beep -l 100 -f 500"
+
+
+goto :: PagerConfig -> (Position, Position) -> PagerState -> X PagerState
+goto PagerConfig{p_wrap=True}  = wrapFocus
+goto PagerConfig{p_wrap=False} = moveFocus
 
 
 moveFocus :: (Position, Position) -> PagerState -> X PagerState
