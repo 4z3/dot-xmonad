@@ -20,6 +20,7 @@ import XMonad.Util.XUtils
 
 import Debunk
 
+
 data PagerMatch = PagerMatchInfix | PagerMatchPrefix
 
 data PagerConfig = PagerConfig
@@ -44,6 +45,7 @@ data PagerState = PagerState
     , search        :: String
     , pagerXMF      :: XMonadFont
     , pagerFocus    :: (Position, Position)
+    , strings       :: [String]
     }
 
 
@@ -54,18 +56,14 @@ match m s ws = do
         then Just $ head cands
         else Nothing
 
+pager :: PagerConfig -> (String -> X ()) -> [String] -> X ()
+pager c viewFunc as = newPager c as >>= pagerMode viewFunc c
 
-pager :: PagerConfig -> (WorkspaceId -> WindowSet -> WindowSet) -> X ()
-pager c viewFunc = newPager c >>= pagerMode viewFunc c
 
-
-pagerMode :: (WorkspaceId -> WindowSet -> WindowSet) -> PagerConfig -> PagerState -> X ()
+pagerMode :: (String -> X ()) -> PagerConfig -> PagerState -> X ()
 pagerMode viewFunc c p = do
-
-    ss <- gets windowset
-
-    case match (p_matchmethod c) (search p) (map tag $ hidden ss) of
-        Just i -> removePager p >> windows (viewFunc i)
+    case match (p_matchmethod c) (search p) (strings p) of
+        Just i -> removePager p >> viewFunc i
         Nothing -> do
             redraw c p
             submapDefault (failbeep >> pagerMode viewFunc c p) . fromList $
@@ -84,7 +82,7 @@ pagerMode viewFunc c p = do
                         , ((0, xK_Right     ), moveFocus ( 1, 0) p >>= pagerMode viewFunc c)
                         , ((0, xK_Up        ), moveFocus ( 0,-1) p >>= pagerMode viewFunc c)
                         , ((0, xK_Down      ), moveFocus ( 0, 1) p >>= pagerMode viewFunc c)
-                        , ((0, xK_Return    ), removePager p >> selectFocused p >>= windows . viewFunc)
+                        , ((0, xK_Return    ), removePager p >> return (selectFocused p) >>= viewFunc)
                         ]
 
 
@@ -126,17 +124,10 @@ wrapFocus (dx, 0) p = do
 wrapFocus _ p = failbeep >> return p
 
 
-selectFocused :: PagerState -> X WorkspaceId
-selectFocused p = do
-    ss <- gets windowset
-
-    let currentTag = tag $ workspace $ current ss
-    let hiddenTags = map tag $ hidden ss
-
-    let wsTags = hiddenTags ++ [currentTag]
-
+selectFocused :: PagerState -> String
+selectFocused p =
     -- TODO the pager must never "focus" something inexistent
-    return $ fromJust $ lookup (pagerFocus p) $ zip wave wsTags
+    fromJust $ lookup (pagerFocus p) $ zip wave (strings p)
 
 
 incSearchPushChar c p = return p { search = search p ++ [c] }
@@ -154,18 +145,14 @@ data TagState = Current | Candidate | Other
 
 redraw :: PagerConfig -> PagerState -> X ()
 redraw c p = do
-    ss <- gets windowset
-
     let w   = p_cellwidth c
         h   = p_cellheight c
         bw  = p_borderwidth c
         bc  = p_bordercolor c
         mc  = p_matchcolor c
 
-    let currentTag = tag $ workspace $ current ss
-    let hiddenTags = map tag $ hidden ss
-
-    let wsTags = hiddenTags ++ [currentTag]
+    let wsTags = strings p
+    let currentTag = last wsTags
 
     forM_ (zip4 [1..] wsTags (pagerWindows p) wave)
           (\(i, tag, win, pos) -> do
@@ -184,8 +171,8 @@ redraw c p = do
             my_paintAndWrite win (pagerXMF p) w h bw bg bc fg bg [AlignCenter] [tag] matchStuff)
 
 
-newPager :: PagerConfig -> X PagerState
-newPager c = do
+newPager :: PagerConfig -> [String] -> X PagerState
+newPager c as = do
     fn <- initXMF (p_font c)
 
     ss <- gets windowset
@@ -198,11 +185,8 @@ newPager c = do
         dx = fromIntegral (p_cellwidth c) - 1
         dy = fromIntegral (p_cellheight c) - 1
 
-    let currentTag = tag $ workspace $ current ss
-    let hiddenTags = map tag $ hidden ss
-
-    let wsTags = hiddenTags ++ [currentTag]
-
+    let wsTags = as
+    let currentTag = last wsTags
 
     pws <- zipWithM
             (\ tag (ox, oy) -> do
@@ -213,11 +197,11 @@ newPager c = do
 
     showWindows pws
 
-    return $ PagerState pws "" fn (0,0)
+    return $ PagerState pws "" fn (0,0) wsTags
 
 
 removePager :: PagerState -> X ()
-removePager (PagerState pws _ fn _) = do
+removePager (PagerState pws _ fn _ _) = do
     releaseXMF fn
     deleteWindows pws
 
