@@ -106,24 +106,20 @@ moveFocus (dx, dy) p = do
 
 
 wrapFocus :: (Position, Position) -> PagerState -> X PagerState
+
 wrapFocus (0, dy) p = do
-    let (x, y) = ps_focus p
+    let focus = ps_focus p
         reachableCoords = take (length $ ps_windows p) wave
-
-    let xcolumn = sortBy (comparing snd) $ filter ((==)x.fst) reachableCoords
-
-    let focus' = xcolumn !! ((fromIntegral (fromJust (findIndex ((==)(x, y)) xcolumn)) + fromIntegral dy) `mod` length xcolumn)
-    return p { ps_focus = focus' }
-
+        column = sortBy (comparing snd) $ filter ((==) (fst focus) . fst) reachableCoords
+        i = fromJust (elemIndex focus column)
+    return p { ps_focus = column `modIndex` (i + fromIntegral dy) }
 
 wrapFocus (dx, 0) p = do
-    let (x, y) = ps_focus p
+    let focus = ps_focus p
         reachableCoords = take (length $ ps_windows p) wave
-
-    let ycolumn = sortBy (comparing fst) $ filter ((==)y.snd) reachableCoords
-
-    let focus' = ycolumn !! ((fromIntegral (fromJust (findIndex ((==)(x, y)) ycolumn)) + fromIntegral dx) `mod` length ycolumn)
-    return p { ps_focus = focus' }
+        column = sortBy (comparing fst) $ filter ((==) (snd focus) . snd) reachableCoords
+        i = fromJust (elemIndex focus column)
+    return p { ps_focus = column `modIndex` (i + fromIntegral dx) }
 
 
 wrapFocus _ p = failbeep >> return p
@@ -335,3 +331,7 @@ findPrefixIndex needle haystack =
     if isPrefixOf needle haystack
         then Just 0
         else Nothing
+
+
+modIndex :: Integral i => [a] -> i -> a
+modIndex xs i = xs `genericIndex` (i `mod` genericLength xs)
