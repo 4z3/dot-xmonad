@@ -65,8 +65,8 @@ pager c viewFunc as = newPager c as >>= pagerMode viewFunc c
 pagerMode :: (String -> X ()) -> PagerConfig -> PagerState -> X ()
 pagerMode viewFunc c p =
     case match (p_matchmethod c) (search p) (init $ strings p) of
-        Just i -> removePager p >> viewFunc i
         Nothing -> redraw c p >> submapString def keys
+        Just i -> removePager p >> viewFunc i
     where
     def (ch:[]) | isPrint ch =
         incSearchPushChar ch p >>= pagerMode viewFunc c
