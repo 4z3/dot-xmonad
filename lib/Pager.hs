@@ -94,36 +94,35 @@ failbeep = spawn "beep -l 100 -f 500"
 
 
 goto :: PagerConfig -> (Position, Position) -> PagerState -> X PagerState
-goto PagerConfig{pc_wrap=True}  = wrapFocus
-goto PagerConfig{pc_wrap=False} = moveFocus
+goto PagerConfig{pc_wrap=True}  xy p = maybe (failbeep >> return p) return $ wrapFocus xy p
+goto PagerConfig{pc_wrap=False} xy p = maybe (failbeep >> return p) return $ moveFocus xy p
 
 
-moveFocus :: (Position, Position) -> PagerState -> X PagerState
+moveFocus :: (Position, Position) -> PagerState -> Maybe PagerState
 moveFocus (dx, dy) p = do
     let (x, y) = ps_focus p
         focus' = (x + dx, y + dy)
 
     if elem focus' (reachableCoords p)
-        then return p { ps_focus = focus' }
-        else failbeep >> return p
+        then Just p { ps_focus = focus' }
+        else Nothing
 
 
-wrapFocus :: (Position, Position) -> PagerState -> X PagerState
+wrapFocus :: (Position, Position) -> PagerState -> Maybe PagerState
 
 wrapFocus (0, dy) p = do
     let focus = ps_focus p
         column = sortBy (comparing snd) $ filter ((==) (fst focus) . fst) (reachableCoords p)
-        i = fromJust (elemIndex focus column)
+    i <- elemIndex focus column
     return p { ps_focus = column `modIndex` (i + fromIntegral dy) }
 
 wrapFocus (dx, 0) p = do
     let focus = ps_focus p
         column = sortBy (comparing fst) $ filter ((==) (snd focus) . snd) (reachableCoords p)
-        i = fromJust (elemIndex focus column)
+    i <- elemIndex focus column
     return p { ps_focus = column `modIndex` (i + fromIntegral dx) }
 
-
-wrapFocus _ p = failbeep >> return p
+wrapFocus _ _ = Nothing
 
 
 selectFocused :: PagerState -> String
