@@ -70,22 +70,22 @@ pagerMode viewFunc c p = do
             redraw c p
             submapString def keys
     where
-            def (ch:[]) | isPrint ch =
-                incSearchPushChar ch p >>= pagerMode viewFunc c
+    def (ch:[]) | isPrint ch =
+        incSearchPushChar ch p >>= pagerMode viewFunc c
 
-            def _ =
-                failbeep >> pagerMode viewFunc c p
+    def _ =
+        failbeep >> pagerMode viewFunc c p
 
-            keys = fromList $
-                        [ ((0, xK_BackSpace ), incSearchPopChar p >>= pagerMode viewFunc c)
-                        , ((0, xK_Escape    ), removePager p)
-                        , ((0, xK_Menu      ), removePager p)
-                        , ((0, xK_Left      ), goto c (-1, 0) p >>= pagerMode viewFunc c)
-                        , ((0, xK_Right     ), goto c ( 1, 0) p >>= pagerMode viewFunc c)
-                        , ((0, xK_Up        ), goto c ( 0,-1) p >>= pagerMode viewFunc c)
-                        , ((0, xK_Down      ), goto c ( 0, 1) p >>= pagerMode viewFunc c)
-                        , ((0, xK_Return    ), removePager p >> return (selectFocused p) >>= viewFunc)
-                        ]
+    keys = fromList $
+        [ ((0, xK_BackSpace ), incSearchPopChar p >>= pagerMode viewFunc c)
+        , ((0, xK_Escape    ), removePager p)
+        , ((0, xK_Menu      ), removePager p)
+        , ((0, xK_Left      ), goto c (-1, 0) p >>= pagerMode viewFunc c)
+        , ((0, xK_Right     ), goto c ( 1, 0) p >>= pagerMode viewFunc c)
+        , ((0, xK_Up        ), goto c ( 0,-1) p >>= pagerMode viewFunc c)
+        , ((0, xK_Down      ), goto c ( 0, 1) p >>= pagerMode viewFunc c)
+        , ((0, xK_Return    ), removePager p >> return (selectFocused p) >>= viewFunc)
+        ]
 
 
 failbeep = spawn "beep -l 100 -f 500"
