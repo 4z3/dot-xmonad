@@ -99,10 +99,8 @@ goto PagerConfig{pc_wrap=False} xy p = maybe (failbeep >> return p) return $ mov
 
 
 moveFocus :: (Position, Position) -> PagerState -> Maybe PagerState
-moveFocus (dx, dy) p = do
-    let (x, y) = ps_focus p
-        focus' = (x + dx, y + dy)
-
+moveFocus (dx, dy) p@PagerState{ps_focus=(x,y)} = do
+    let focus' = (x + dx, y + dy)
     if elem focus' (reachableCoords p)
         then Just p { ps_focus = focus' }
         else Nothing
@@ -110,15 +108,13 @@ moveFocus (dx, dy) p = do
 
 wrapFocus :: (Position, Position) -> PagerState -> Maybe PagerState
 
-wrapFocus (0, dy) p = do
-    let focus = ps_focus p
-        column = sortBy (comparing snd) $ filter ((==) (fst focus) . fst) (reachableCoords p)
+wrapFocus (0, dy) p@PagerState{ps_focus=focus} = do
+    let column = sortBy (comparing snd) $ filter ((==) (fst focus) . fst) (reachableCoords p)
     i <- elemIndex focus column
     return p { ps_focus = column `modIndex` (i + fromIntegral dy) }
 
-wrapFocus (dx, 0) p = do
-    let focus = ps_focus p
-        column = sortBy (comparing fst) $ filter ((==) (snd focus) . snd) (reachableCoords p)
+wrapFocus (dx, 0) p@PagerState{ps_focus=focus} = do
+    let column = sortBy (comparing fst) $ filter ((==) (snd focus) . snd) (reachableCoords p)
     i <- elemIndex focus column
     return p { ps_focus = column `modIndex` (i + fromIntegral dx) }
 
