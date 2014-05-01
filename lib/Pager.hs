@@ -25,16 +25,16 @@ import Submap
 data PagerMatch = PagerMatchInfix | PagerMatchPrefix
 
 data PagerConfig = PagerConfig
-    { p_font        :: String
-    , p_cellwidth   :: Dimension
-    , p_cellheight  :: Dimension
-    -- , p_cellpadding :: Dimension
-    , p_borderwidth :: Dimension
-    , p_bordercolor :: String
-    , p_matchcolor  :: String
-    , p_matchmethod :: PagerMatch
-    , p_uncolor     :: (String, String) -- ^ color of current (unavailable) cell (background, foreground)
-    , p_wrap        :: Bool
+    { pc_font           :: String
+    , pc_cellwidth      :: Dimension
+    , pc_cellheight     :: Dimension
+    --, pc_cellpadding    :: Dimension
+    , pc_borderwidth    :: Dimension
+    , pc_bordercolor    :: String
+    , pc_matchcolor     :: String
+    , pc_matchmethod    :: PagerMatch
+    , pc_uncolor        :: (String, String) -- ^ color of current (unavailable) cell (background, foreground)
+    , pc_wrap           :: Bool
     }
 
 
@@ -43,11 +43,11 @@ defaultPagerConfig = PagerConfig "xft:Sans-8" 100 30 2 "white" "magenta" PagerMa
 
 
 data PagerState = PagerState
-    { pagerWindows  :: [Window]
-    , search        :: String
-    , pagerXMF      :: XMonadFont
-    , pagerFocus    :: (Position, Position)
-    , strings       :: [String]
+    { ps_windows    :: [Window]
+    , ps_search     :: String
+    , ps_font       :: XMonadFont
+    , ps_focus      :: (Position, Position)
+    , ps_strings    :: [String]
     }
 
 
@@ -59,29 +59,29 @@ match m s ws = do
         else Nothing
 
 pager :: PagerConfig -> (String -> X ()) -> [String] -> X ()
-pager c viewFunc as = newPager c as >>= pagerMode viewFunc c
+pager c viewFunc as = newPager c as >>= ps_Mode viewFunc c
 
 
-pagerMode :: (String -> X ()) -> PagerConfig -> PagerState -> X ()
-pagerMode viewFunc c p =
-    case match (p_matchmethod c) (search p) (init $ strings p) of
+ps_Mode :: (String -> X ()) -> PagerConfig -> PagerState -> X ()
+ps_Mode viewFunc c p =
+    case match (pc_matchmethod c) (ps_search p) (init $ ps_strings p) of
         Nothing -> redraw c p >> submapString def keys
         Just i -> removePager p >> viewFunc i
     where
     def (ch:[]) | isPrint ch =
-        incSearchPushChar ch p >>= pagerMode viewFunc c
+        incSearchPushChar ch p >>= ps_Mode viewFunc c
 
     def _ =
-        failbeep >> pagerMode viewFunc c p
+        failbeep >> ps_Mode viewFunc c p
 
     keys = fromList $
-        [ ((0, xK_BackSpace ), incSearchPopChar p >>= pagerMode viewFunc c)
+        [ ((0, xK_BackSpace ), incSearchPopChar p >>= ps_Mode viewFunc c)
         , ((0, xK_Escape    ), removePager p)
         , ((0, xK_Menu      ), removePager p)
-        , ((0, xK_Left      ), goto c (-1, 0) p >>= pagerMode viewFunc c)
-        , ((0, xK_Right     ), goto c ( 1, 0) p >>= pagerMode viewFunc c)
-        , ((0, xK_Up        ), goto c ( 0,-1) p >>= pagerMode viewFunc c)
-        , ((0, xK_Down      ), goto c ( 0, 1) p >>= pagerMode viewFunc c)
+        , ((0, xK_Left      ), goto c (-1, 0) p >>= ps_Mode viewFunc c)
+        , ((0, xK_Right     ), goto c ( 1, 0) p >>= ps_Mode viewFunc c)
+        , ((0, xK_Up        ), goto c ( 0,-1) p >>= ps_Mode viewFunc c)
+        , ((0, xK_Down      ), goto c ( 0, 1) p >>= ps_Mode viewFunc c)
         , ((0, xK_Return    ), removePager p >> return (selectFocused p) >>= viewFunc)
         ]
 
@@ -90,40 +90,40 @@ failbeep = spawn "beep -l 100 -f 500"
 
 
 goto :: PagerConfig -> (Position, Position) -> PagerState -> X PagerState
-goto PagerConfig{p_wrap=True}  = wrapFocus
-goto PagerConfig{p_wrap=False} = moveFocus
+goto PagerConfig{pc_wrap=True}  = wrapFocus
+goto PagerConfig{pc_wrap=False} = moveFocus
 
 
 moveFocus :: (Position, Position) -> PagerState -> X PagerState
 moveFocus (dx, dy) p = do
-    let (x, y) = pagerFocus p
+    let (x, y) = ps_focus p
         focus' = (x + dx, y + dy)
-        reachableCoords = take (length $ pagerWindows p) wave
+        reachableCoords = take (length $ ps_windows p) wave
 
     if elem focus' reachableCoords
-        then return p { pagerFocus = focus' }
+        then return p { ps_focus = focus' }
         else failbeep >> return p
 
 
 wrapFocus :: (Position, Position) -> PagerState -> X PagerState
 wrapFocus (0, dy) p = do
-    let (x, y) = pagerFocus p
-        reachableCoords = take (length $ pagerWindows p) wave
+    let (x, y) = ps_focus p
+        reachableCoords = take (length $ ps_windows p) wave
 
     let xcolumn = sortBy (comparing snd) $ filter ((==)x.fst) reachableCoords
 
     let focus' = xcolumn !! ((fromIntegral (fromJust (findIndex ((==)(x, y)) xcolumn)) + fromIntegral dy) `mod` length xcolumn)
-    return p { pagerFocus = focus' }
+    return p { ps_focus = focus' }
 
 
 wrapFocus (dx, 0) p = do
-    let (x, y) = pagerFocus p
-        reachableCoords = take (length $ pagerWindows p) wave
+    let (x, y) = ps_focus p
+        reachableCoords = take (length $ ps_windows p) wave
 
     let ycolumn = sortBy (comparing fst) $ filter ((==)y.snd) reachableCoords
 
     let focus' = ycolumn !! ((fromIntegral (fromJust (findIndex ((==)(x, y)) ycolumn)) + fromIntegral dx) `mod` length ycolumn)
-    return p { pagerFocus = focus' }
+    return p { ps_focus = focus' }
 
 
 wrapFocus _ p = failbeep >> return p
@@ -132,14 +132,19 @@ wrapFocus _ p = failbeep >> return p
 selectFocused :: PagerState -> String
 selectFocused p =
     -- TODO the pager must never "focus" something inexistent
-    fromJust $ lookup (pagerFocus p) $ zip wave (strings p)
+    fromJust $ lookup (ps_focus p) $ zip wave (ps_strings p)
 
 
-incSearchPushChar c p = return p { search = search p ++ [c] }
+incSearchPushChar :: Char -> PagerState -> X PagerState
+incSearchPushChar c p = return p { ps_search = ps_search p ++ [c] }
 
+
+incSearchPopChar :: PagerState -> X PagerState
 
 -- only rubout if we have at least one char
-incSearchPopChar p@PagerState{search=xs@(_:_)} = return p { search = init xs }
+incSearchPopChar p@PagerState{ps_search=xs@(_:_)} =
+    return p { ps_search = init xs }
+
 incSearchPopChar p = return p
 
 
@@ -150,45 +155,45 @@ data TagState = Current | Candidate | Other
 
 redraw :: PagerConfig -> PagerState -> X ()
 redraw c p = do
-    let w   = p_cellwidth c
-        h   = p_cellheight c
-        bw  = p_borderwidth c
-        bc  = p_bordercolor c
-        mc  = p_matchcolor c
+    let w   = pc_cellwidth c
+        h   = pc_cellheight c
+        bw  = pc_borderwidth c
+        bc  = pc_bordercolor c
+        mc  = pc_matchcolor c
 
-    let wsTags = strings p
+    let wsTags = ps_strings p
     let currentTag = last wsTags
 
-    forM_ (zip4 [1..] wsTags (pagerWindows p) wave)
+    forM_ (zip4 [1..] wsTags (ps_windows p) wave)
           (\(i, tag, win, pos) -> do
 
-            (bg, fg) <- if pos == pagerFocus p
+            (bg, fg) <- if pos == ps_focus p
                             then defaultColorizer tag True
                             else
-                                if isXOf (p_matchmethod c) (search p) tag
-                                    then colorizer c (search p) currentTag tag
-                                    else return $ p_uncolor c
+                                if isXOf (pc_matchmethod c) (ps_search p) tag
+                                    then colorizer c (ps_search p) currentTag tag
+                                    else return $ pc_uncolor c
 
             let matchStuff = if tag == currentTag
                                  then Nothing
-                                 else Just (p_matchmethod c, search p, mc)
+                                 else Just (pc_matchmethod c, ps_search p, mc)
 
-            my_paintAndWrite win (pagerXMF p) w h bw bg bc fg bg [AlignCenter] [tag] matchStuff)
+            my_paintAndWrite win (ps_font p) w h bw bg bc fg bg [AlignCenter] [tag] matchStuff)
 
 
 newPager :: PagerConfig -> [String] -> X PagerState
 newPager c as = do
-    fn <- initXMF (p_font c)
+    fn <- initXMF (pc_font c)
 
     ss <- gets windowset
 
     let Screen _ _ (SD (Rectangle _ _ s_width s_height)) = current ss
         x  = fromIntegral $ s_width `div` 2
         y  = fromIntegral $ s_height `div` 2
-        w  = p_cellwidth c
-        h  = p_cellheight c
-        dx = fromIntegral (p_cellwidth c) - 1
-        dy = fromIntegral (p_cellheight c) - 1
+        w  = pc_cellwidth c
+        h  = pc_cellheight c
+        dx = fromIntegral (pc_cellwidth c) - 1
+        dy = fromIntegral (pc_cellheight c) - 1
 
     let wsTags = as
     let currentTag = last wsTags
@@ -220,7 +225,7 @@ tagState searchInput currentTag t
 colorizer :: PagerConfig -> String -> String -> String -> X (String, String)
 colorizer c searchInput currentTag tag =
     case tagState searchInput currentTag tag of
-        Current     -> return $ p_uncolor c
+        Current     -> return $ pc_uncolor c
         --Candidate   -> defaultColorizer tag True
         _           -> defaultColorizer tag False
 
