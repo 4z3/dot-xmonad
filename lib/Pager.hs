@@ -51,6 +51,10 @@ data PagerState = PagerState
     }
 
 
+reachableCoords :: PagerState -> [(Position, Position)]
+reachableCoords PagerState{ps_strings=xs} = take (length xs) wave
+
+
 match :: PagerMatch -> String -> [String] -> Maybe String
 match m s ws = do
     let cands = filter (isXOf m s) ws
@@ -98,9 +102,8 @@ moveFocus :: (Position, Position) -> PagerState -> X PagerState
 moveFocus (dx, dy) p = do
     let (x, y) = ps_focus p
         focus' = (x + dx, y + dy)
-        reachableCoords = take (length $ ps_windows p) wave
 
-    if elem focus' reachableCoords
+    if elem focus' (reachableCoords p)
         then return p { ps_focus = focus' }
         else failbeep >> return p
 
@@ -109,15 +112,13 @@ wrapFocus :: (Position, Position) -> PagerState -> X PagerState
 
 wrapFocus (0, dy) p = do
     let focus = ps_focus p
-        reachableCoords = take (length $ ps_windows p) wave
-        column = sortBy (comparing snd) $ filter ((==) (fst focus) . fst) reachableCoords
+        column = sortBy (comparing snd) $ filter ((==) (fst focus) . fst) (reachableCoords p)
         i = fromJust (elemIndex focus column)
     return p { ps_focus = column `modIndex` (i + fromIntegral dy) }
 
 wrapFocus (dx, 0) p = do
     let focus = ps_focus p
-        reachableCoords = take (length $ ps_windows p) wave
-        column = sortBy (comparing fst) $ filter ((==) (snd focus) . snd) reachableCoords
+        column = sortBy (comparing fst) $ filter ((==) (snd focus) . snd) (reachableCoords p)
         i = fromJust (elemIndex focus column)
     return p { ps_focus = column `modIndex` (i + fromIntegral dx) }
 
