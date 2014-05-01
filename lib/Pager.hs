@@ -6,19 +6,20 @@ module Pager
     ) where
 
 import Control.Monad ( forM, forM_, when, zipWithM )
+import Data.Char
 import Data.List
 import Data.Ord
 import Data.Map ( fromList )
 import Data.Maybe ( isJust, fromJust )
 import XMonad
 import XMonad.Actions.GridSelect ( defaultColorizer )
-import XMonad.Actions.Submap
 import XMonad.StackSet hiding ( filter )
 import XMonad.Util.Font
 import XMonad.Util.Image ( drawIcon )
 import XMonad.Util.XUtils
 
 import Debunk
+import Submap
 
 
 data PagerMatch = PagerMatchInfix | PagerMatchPrefix
@@ -67,15 +68,15 @@ pagerMode viewFunc c p = do
         Just i -> removePager p >> viewFunc i
         Nothing -> do
             redraw c p
-            submapDefault (failbeep >> pagerMode viewFunc c p) . fromList $
-                        zipWith (\ k chr -> ((0, k), incSearchPushChar chr p >>= pagerMode viewFunc c))
-                                ([xK_0..xK_9] ++ [xK_a..xK_z] ++ [xK_space])
-                                (['0' .. '9'] ++ ['a' .. 'z'] ++ [' '])
-                        ++
-                        zipWith (\ k chr -> ((shiftMask, k), incSearchPushChar chr p >>= pagerMode viewFunc c))
-                                [xK_a..xK_z]
-                                ['A'..'Z']
-                        ++
+            submapString def keys
+    where
+            def (ch:[]) | isPrint ch =
+                incSearchPushChar ch p >>= pagerMode viewFunc c
+
+            def _ =
+                failbeep >> pagerMode viewFunc c p
+
+            keys = fromList $
                         [ ((0, xK_BackSpace ), incSearchPopChar p >>= pagerMode viewFunc c)
                         , ((0, xK_Escape    ), removePager p)
                         , ((0, xK_Menu      ), removePager p)
