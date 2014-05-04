@@ -6,6 +6,7 @@ module Pager
     ) where
 
 import Data.List ( find )
+import Data.Maybe ( catMaybes )
 import Graphics.X11
 import Rhombus
 import XMonad
@@ -20,7 +21,7 @@ data PagerConfig = PagerConfig
     , pc_matchmethod        :: MatchMethod
     , pc_wrap               :: Bool
     , pc_workspaceColors    :: Bool -> Bool -> Bool -> (String, String, String)
-    , pc_windowColors       :: Bool -> Bool -> Bool -> Bool -> (String, String)
+    , pc_windowColors       :: Bool -> Bool -> Bool -> Bool -> Bool -> (String, String)
     }
 
 
@@ -55,24 +56,28 @@ defaultWindowColors :: Bool -- window's workspace has focus
                     -> Bool -- window's workspace name matches incremental search
                     -> Bool -- window's workspace the current one
                     -> Bool -- window is urgent
+                    -> Bool -- window has focus
                     -> (String, String) -- window border and background color
-defaultWindowColors False False False False = ("#111111","#060606")
-defaultWindowColors False False False  True = ("#802020","#401010")
-defaultWindowColors False False  True False = ("#101010","#050505")
-defaultWindowColors False False  True  True = ("#401010","#200505")
-defaultWindowColors False  True False False = ("#202080","#101040")
-defaultWindowColors False  True False  True = ("#802080","#401040")
-defaultWindowColors False  True  True False = ("#101040","#100520")
-defaultWindowColors False  True  True  True = ("#401040","#200520")
 
-defaultWindowColors  True False False False = ("#208020","#104010")
-defaultWindowColors  True False False  True = ("#808020","#404010")
-defaultWindowColors  True False  True False = ("#104010","#052005")
-defaultWindowColors  True False  True  True = ("#404010","#202005")
-defaultWindowColors  True  True False False = ("#208080","#104040")
-defaultWindowColors  True  True False  True = ("#808080","#404040")
-defaultWindowColors  True  True  True False = ("#104040","#102020")
-defaultWindowColors  True  True  True  True = ("#404040","#202020")
+defaultWindowColors   wsf     m     c     u  True = ("#802020", snd $ defaultWindowColors wsf m c u False)
+
+defaultWindowColors False False False False     _ = ("#111111","#060606")
+defaultWindowColors False False False  True     _ = ("#802020","#401010")
+defaultWindowColors False False  True False     _ = ("#101010","#050505")
+defaultWindowColors False False  True  True     _ = ("#401010","#200505")
+defaultWindowColors False  True False False     _ = ("#202080","#101040")
+defaultWindowColors False  True False  True     _ = ("#802080","#401040")
+defaultWindowColors False  True  True False     _ = ("#101040","#100520")
+defaultWindowColors False  True  True  True     _ = ("#401040","#200520")
+
+defaultWindowColors  True False False False     _ = ("#208020","#104010")
+defaultWindowColors  True False False  True     _ = ("#808020","#404010")
+defaultWindowColors  True False  True False     _ = ("#104010","#052005")
+defaultWindowColors  True False  True  True     _ = ("#404010","#202005")
+defaultWindowColors  True  True False False     _ = ("#208080","#104040")
+defaultWindowColors  True  True False  True     _ = ("#808080","#404040")
+defaultWindowColors  True  True  True False     _ = ("#104040","#102020")
+defaultWindowColors  True  True  True  True     _ = ("#404040","#202020")
 
 
 pagerPaint ::
@@ -88,18 +93,18 @@ pagerPaint ::
   -> Bool
   -> X ()
 pagerPaint pc rc d p gc t r focus match current = do
+    ss <- gets windowset
 
     let x = rect_x r
         y = rect_y r
 
     urgents <- readUrgents
+    let foci = map W.focus $ catMaybes $ map W.stack $ W.workspaces ss
 
-    let color = pc_windowColors pc focus match current :: Bool -> (String, String)
+    let color = pc_windowColors pc focus match current -- :: Bool -> (String, String)
         (_, _, _fg_color) = pc_workspaceColors pc focus match current
 
     fg_color <- stringToPixel d _fg_color
-
-    ss <- gets windowset
 
     let r = screenRect $ W.screenDetail $ W.current ss
     let a = fi (rect_width r) / fi (rect_height r)
@@ -110,8 +115,9 @@ pagerPaint pc rc d p gc t r focus match current = do
         whenJust (W.stack ws) $ \ s ->
             withDisplay $ \ d -> io $ do
 
-                let color' = color . (`elem` urgents)
+                let color' w = color (w `elem` urgents) (w `elem` foci)
 
+                -- TODO painting of floating windows is broken
                 mapM_ (drawMiniWindow d p gc x y color' scale) (W.down s)
                 drawMiniWindow d p gc x y color' scale (W.focus s)
                 mapM_ (drawMiniWindow d p gc x y color' scale) (W.up s)
