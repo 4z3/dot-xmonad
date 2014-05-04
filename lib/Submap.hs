@@ -15,8 +15,6 @@ submapString :: (String -> X ()) -> M.Map (KeyMask, KeySym) (X ()) -> X ()
 submapString def keys = do
     XConf { theRoot = root, display = d } <- ask
 
-    io $ grabKeyboard d root False grabModeAsync grabModeAsync currentTime
-
     (m, s, str) <- io $ allocaXEvent $ \p -> fix $ \nextkey -> do
         maskEvent d keyPressMask p
         KeyEvent { ev_keycode = code, ev_state = m } <- getEvent p
@@ -29,7 +27,5 @@ submapString def keys = do
 
     -- Remove num lock mask and Xkb group state bits
     m' <- cleanMask $ m .&. ((1 `shiftL` 12) - 1)
-
-    io $ ungrabKeyboard d currentTime
 
     maybe (def str) id (M.lookup (m', s) keys)

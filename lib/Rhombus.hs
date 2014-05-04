@@ -71,7 +71,7 @@ match m s ws = do
         else Nothing
 
 rhombus :: RhombusConfig -> (String -> X ()) -> [String] -> X ()
-rhombus rc viewFunc as = do
+rhombus rc viewFunc as = withGrabbedKeyboard $ do
     rs <- newRhombus rc as
     --redraw rc rs
     showWindow (rs_window rs)
@@ -358,3 +358,10 @@ modIndex xs i = xs `genericIndex` (i `mod` genericLength xs)
 
 
 forZipWithM_ a b f = zipWithM_ f a b
+
+
+withGrabbedKeyboard f = do
+    XConf { theRoot = root, display = d } <- ask
+    catchX (io (grabKeyboard d root False grabModeAsync grabModeAsync currentTime) >> f)
+           (return ())
+    io $ ungrabKeyboard d currentTime
