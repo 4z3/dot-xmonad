@@ -1,4 +1,4 @@
-module Rhombus
+module Util.Rhombus
     ( defaultRhombusConfig
     , MatchMethod(..)
     , rhombus

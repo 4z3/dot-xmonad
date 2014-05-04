@@ -1,4 +1,4 @@
-module Pager
+module Util.Pager
     ( defaultPagerConfig
     , defaultWindowColors
     , defaultWorkspaceColors
@@ -10,7 +10,7 @@ module Pager
 import Data.List ( find )
 import Data.Maybe ( catMaybes )
 import Graphics.X11
-import Rhombus
+import Util.Rhombus
 import XMonad
 import qualified XMonad.StackSet as W
 import XMonad.Hooks.UrgencyHook
