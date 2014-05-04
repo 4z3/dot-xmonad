@@ -113,8 +113,8 @@ pagerPaint pc rc d p gc t r focus match current = do
                 let color' = color . (`elem` urgents)
 
                 mapM_ (drawMiniWindow d p gc x y color' scale) (W.down s)
-                mapM_ (drawMiniWindow d p gc x y color' scale) (W.up s)
                 drawMiniWindow d p gc x y color' scale (W.focus s)
+                mapM_ (drawMiniWindow d p gc x y color' scale) (W.up s)
 
 drawMiniWindow
     :: RealFrac a
