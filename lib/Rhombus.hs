@@ -1,9 +1,9 @@
 module Rhombus
-    ( rhombus
-    , defaultRhombusConfig
+    ( defaultRhombusConfig
+    , MatchMethod(..)
+    , rhombus
     , RhombusConfig(..)
     , RhombusState(..)
-    , RhombusMatch(..)
     ) where
 
 import Control.Monad ( forM_, zipWithM_ )
@@ -24,23 +24,23 @@ import Util.XUtils
 import Util.Font
 
 
-data RhombusMatch = RhombusMatchInfix | RhombusMatchPrefix
+data MatchMethod = MatchInfix | MatchPrefix
 
 data RhombusConfig = RhombusConfig
     { rc_font           :: String
     , rc_cellwidth      :: Dimension
-    , rc_matchmethod    :: RhombusMatch
+    , rc_matchmethod    :: MatchMethod
     , rc_wrap           :: Bool
     , rc_colors         :: Bool -> Bool -> Bool -> (String, String, String)
-    , rc_paint          :: RhombusConfig -> RhombusState -> Display -> Pixmap -> GC -> String -> Rectangle -> Bool -> Bool -> Bool -> X ()
+    , rc_paint          :: RhombusConfig -> Display -> Pixmap -> GC -> String -> Rectangle -> Bool -> Bool -> Bool -> X ()
     }
 
 
 -- TODO currently xft is broken
-defaultRhombusConfig = RhombusConfig "xft:Sans-8" 100 RhombusMatchInfix True stupidColors noPaint
+defaultRhombusConfig = RhombusConfig "xft:Sans-8" 100 MatchInfix True stupidColors noPaint
     where
     stupidColors _ _ _ = ("red", "magenta", "yellow")
-    noPaint _ _ _ _ _ _ _ _ _ _ = return ()
+    noPaint _ _ _ _ _ _ _ _ _ = return ()
 
 
 data RhombusState = RhombusState
@@ -56,7 +56,7 @@ reachableCoords :: RhombusState -> [(Position, Position)]
 reachableCoords RhombusState{rs_strings=xs} = take (length xs) wave
 
 
-match :: RhombusMatch -> String -> [String] -> Maybe String
+match :: MatchMethod -> String -> [String] -> Maybe String
 match m s ws = do
     let cands = filter (isXOf m s) ws
     if length cands == 1
@@ -212,7 +212,7 @@ redraw rc rs = do
                     coordModePrevious
 
             -- custom draw
-            paint rc rs d p g tag (Rectangle (cell_x + 1) (cell_y + 1) cell_w cell_h) focus match current
+            paint rc d p g tag (Rectangle (cell_x + 1) (cell_y + 1) cell_w cell_h) focus match current
 
             -- paint text
             -- TODO custom paint text?
@@ -296,14 +296,14 @@ commonPrefix (x:xs) (y:ys) | x == y = x:commonPrefix xs ys
 commonPrefix _ _ = []
 
 
-isXOf :: RhombusMatch -> String -> String -> Bool
-isXOf RhombusMatchInfix  = isInfixOf
-isXOf RhombusMatchPrefix = isPrefixOf
+isXOf :: MatchMethod -> String -> String -> Bool
+isXOf MatchInfix  = isInfixOf
+isXOf MatchPrefix = isPrefixOf
 
 
-findXIndex :: (Eq a) => RhombusMatch -> [a] -> [a] -> Maybe Int
-findXIndex RhombusMatchInfix  = findInfixIndex
-findXIndex RhombusMatchPrefix = findPrefixIndex
+findXIndex :: (Eq a) => MatchMethod -> [a] -> [a] -> Maybe Int
+findXIndex MatchInfix  = findInfixIndex
+findXIndex MatchPrefix = findPrefixIndex
 
 
 findInfixIndex :: (Eq a) => [a] -> [a] -> Maybe Int
