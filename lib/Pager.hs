@@ -1,5 +1,7 @@
 module Pager
     ( defaultPagerConfig
+    , defaultWindowColors
+    , defaultWorkspaceColors
     , MatchMethod(..)
     , pager
     , PagerConfig(..)
