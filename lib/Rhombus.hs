@@ -1,9 +1,9 @@
-module Pager
-    ( pager
-    , defaultPagerConfig
-    , PagerConfig(..)
-    , PagerState(..)
-    , PagerMatch(..)
+module Rhombus
+    ( rhombus
+    , defaultRhombusConfig
+    , RhombusConfig(..)
+    , RhombusState(..)
+    , RhombusMatch(..)
     ) where
 
 import Control.Monad ( forM_, zipWithM_ )
@@ -24,74 +24,74 @@ import Util.XUtils
 import Util.Font
 
 
-data PagerMatch = PagerMatchInfix | PagerMatchPrefix
+data RhombusMatch = RhombusMatchInfix | RhombusMatchPrefix
 
-data PagerConfig = PagerConfig
-    { pc_font           :: String
-    , pc_cellwidth      :: Dimension
-    , pc_matchmethod    :: PagerMatch
-    , pc_wrap           :: Bool
-    , pc_colors         :: Bool -> Bool -> Bool -> (String, String, String)
-    , pc_paint          :: PagerConfig -> PagerState -> Display -> Pixmap -> GC -> String -> Rectangle -> Bool -> Bool -> Bool -> X ()
+data RhombusConfig = RhombusConfig
+    { rc_font           :: String
+    , rc_cellwidth      :: Dimension
+    , rc_matchmethod    :: RhombusMatch
+    , rc_wrap           :: Bool
+    , rc_colors         :: Bool -> Bool -> Bool -> (String, String, String)
+    , rc_paint          :: RhombusConfig -> RhombusState -> Display -> Pixmap -> GC -> String -> Rectangle -> Bool -> Bool -> Bool -> X ()
     }
 
 
 -- TODO currently xft is broken
-defaultPagerConfig = PagerConfig "xft:Sans-8" 100 PagerMatchInfix True stupidColors noPaint
+defaultRhombusConfig = RhombusConfig "xft:Sans-8" 100 RhombusMatchInfix True stupidColors noPaint
     where
     stupidColors _ _ _ = ("red", "magenta", "yellow")
     noPaint _ _ _ _ _ _ _ _ _ _ = return ()
 
 
-data PagerState = PagerState
-    { ps_window     :: Window
-    , ps_search     :: String
-    , ps_font       :: XMonadFont
-    , ps_focus      :: (Position, Position)
-    , ps_strings    :: [String]
+data RhombusState = RhombusState
+    { rs_window     :: Window
+    , rs_search     :: String
+    , rs_font       :: XMonadFont
+    , rs_focus      :: (Position, Position)
+    , rs_strings    :: [String]
     }
 
 
-reachableCoords :: PagerState -> [(Position, Position)]
-reachableCoords PagerState{ps_strings=xs} = take (length xs) wave
+reachableCoords :: RhombusState -> [(Position, Position)]
+reachableCoords RhombusState{rs_strings=xs} = take (length xs) wave
 
 
-match :: PagerMatch -> String -> [String] -> Maybe String
+match :: RhombusMatch -> String -> [String] -> Maybe String
 match m s ws = do
     let cands = filter (isXOf m s) ws
     if length cands == 1
         then Just $ head cands
         else Nothing
 
-pager :: PagerConfig -> (String -> X ()) -> [String] -> X ()
-pager pc viewFunc as = do
-    ps <- newPager pc as
-    --redraw pc ps
-    showWindow (ps_window ps)
-    pagerMode viewFunc pc ps
+rhombus :: RhombusConfig -> (String -> X ()) -> [String] -> X ()
+rhombus rc viewFunc as = do
+    rs <- newRhombus rc as
+    --redraw rc rs
+    showWindow (rs_window rs)
+    rhombusMode viewFunc rc rs
 
 
-pagerMode :: (String -> X ()) -> PagerConfig -> PagerState -> X ()
-pagerMode viewFunc c p =
-    case match (pc_matchmethod c) (ps_search p) (init $ ps_strings p) of
-        Nothing -> redraw c p >> submapString def keys
-        Just i -> removePager p >> viewFunc i
+rhombusMode :: (String -> X ()) -> RhombusConfig -> RhombusState -> X ()
+rhombusMode viewFunc rc rs =
+    case match (rc_matchmethod rc) (rs_search rs) (init $ rs_strings rs) of
+        Nothing -> redraw rc rs >> submapString def keys
+        Just i -> removeRhombus rs >> viewFunc i
     where
     def (ch:[]) | isPrint ch =
-        incSearchPushChar ch p >>= pagerMode viewFunc c
+        incSearchPushChar ch rs >>= rhombusMode viewFunc rc
 
     def _ =
-        failbeep >> pagerMode viewFunc c p
+        failbeep >> rhombusMode viewFunc rc rs
 
     keys = fromList $
-        [ ((0, xK_BackSpace ), incSearchPopChar p >>= pagerMode viewFunc c)
-        , ((0, xK_Escape    ), removePager p)
-        , ((0, xK_Menu      ), removePager p)
-        , ((0, xK_Left      ), goto c (-1, 0) p >>= pagerMode viewFunc c)
-        , ((0, xK_Right     ), goto c ( 1, 0) p >>= pagerMode viewFunc c)
-        , ((0, xK_Up        ), goto c ( 0,-1) p >>= pagerMode viewFunc c)
-        , ((0, xK_Down      ), goto c ( 0, 1) p >>= pagerMode viewFunc c)
-        , ((0, xK_Return    ), removePager p >> return (selectFocused p) >>= viewFunc)
+        [ ((0, xK_BackSpace ), incSearchPopChar rs >>= rhombusMode viewFunc rc)
+        , ((0, xK_Escape    ), removeRhombus rs)
+        , ((0, xK_Menu      ), removeRhombus rs)
+        , ((0, xK_Left      ), goto rc (-1, 0) rs >>= rhombusMode viewFunc rc)
+        , ((0, xK_Right     ), goto rc ( 1, 0) rs >>= rhombusMode viewFunc rc)
+        , ((0, xK_Up        ), goto rc ( 0,-1) rs >>= rhombusMode viewFunc rc)
+        , ((0, xK_Down      ), goto rc ( 0, 1) rs >>= rhombusMode viewFunc rc)
+        , ((0, xK_Return    ), removeRhombus rs >> return (selectFocused rs) >>= viewFunc)
         ]
 
 
@@ -99,62 +99,62 @@ pagerMode viewFunc c p =
 failbeep = spawn "beep -l 100 -f 500"
 
 
-goto :: PagerConfig -> (Position, Position) -> PagerState -> X PagerState
-goto PagerConfig{pc_wrap=True}  xy p = maybe (failbeep >> return p) return $ wrapFocus xy p
-goto PagerConfig{pc_wrap=False} xy p = maybe (failbeep >> return p) return $ moveFocus xy p
+goto :: RhombusConfig -> (Position, Position) -> RhombusState -> X RhombusState
+goto RhombusConfig{rc_wrap=True}  xy rs = maybe (failbeep >> return rs) return $ wrapFocus xy rs
+goto RhombusConfig{rc_wrap=False} xy rs = maybe (failbeep >> return rs) return $ moveFocus xy rs
 
 
-moveFocus :: (Position, Position) -> PagerState -> Maybe PagerState
-moveFocus (dx, dy) p@PagerState{ps_focus=(x,y)} = do
+moveFocus :: (Position, Position) -> RhombusState -> Maybe RhombusState
+moveFocus (dx, dy) rs@RhombusState{rs_focus=(x,y)} = do
     let focus' = (x + dx, y + dy)
-    if elem focus' (reachableCoords p)
-        then Just p { ps_focus = focus' }
+    if elem focus' (reachableCoords rs)
+        then Just rs { rs_focus = focus' }
         else Nothing
 
 
-wrapFocus :: (Position, Position) -> PagerState -> Maybe PagerState
+wrapFocus :: (Position, Position) -> RhombusState -> Maybe RhombusState
 
-wrapFocus (0, dy) p@PagerState{ps_focus=focus} = do
-    let column = sortBy (comparing snd) $ filter ((==) (fst focus) . fst) (reachableCoords p)
+wrapFocus (0, dy) rs@RhombusState{rs_focus=focus} = do
+    let column = sortBy (comparing snd) $ filter ((==) (fst focus) . fst) (reachableCoords rs)
     i <- elemIndex focus column
-    return p { ps_focus = column `modIndex` (i + fromIntegral dy) }
+    return rs { rs_focus = column `modIndex` (i + fromIntegral dy) }
 
-wrapFocus (dx, 0) p@PagerState{ps_focus=focus} = do
-    let column = sortBy (comparing fst) $ filter ((==) (snd focus) . snd) (reachableCoords p)
+wrapFocus (dx, 0) rs@RhombusState{rs_focus=focus} = do
+    let column = sortBy (comparing fst) $ filter ((==) (snd focus) . snd) (reachableCoords rs)
     i <- elemIndex focus column
-    return p { ps_focus = column `modIndex` (i + fromIntegral dx) }
+    return rs { rs_focus = column `modIndex` (i + fromIntegral dx) }
 
 wrapFocus _ _ = Nothing
 
 
-selectFocused :: PagerState -> String
-selectFocused p =
-    -- TODO the pager must never "focus" something inexistent
-    fromJust $ lookup (ps_focus p) $ zip wave (ps_strings p)
+selectFocused :: RhombusState -> String
+selectFocused rs =
+    -- TODO the rhombus must never "focus" something inexistent
+    fromJust $ lookup (rs_focus rs) $ zip wave (rs_strings rs)
 
 
-incSearchPushChar :: Char -> PagerState -> X PagerState
-incSearchPushChar c p = return p { ps_search = ps_search p ++ [c] }
+incSearchPushChar :: Char -> RhombusState -> X RhombusState
+incSearchPushChar c rs = return rs { rs_search = rs_search rs ++ [c] }
 
 
-incSearchPopChar :: PagerState -> X PagerState
+incSearchPopChar :: RhombusState -> X RhombusState
 
 -- only rubout if we have at least one char
-incSearchPopChar p@PagerState{ps_search=xs@(_:_)} =
-    return p { ps_search = init xs }
+incSearchPopChar rs@RhombusState{rs_search=xs@(_:_)} =
+    return rs { rs_search = init xs }
 
-incSearchPopChar p = return p
+incSearchPopChar rs = return rs
 
 
-redraw :: PagerConfig -> PagerState -> X ()
-redraw pc ps = do
+redraw :: RhombusConfig -> RhombusState -> X ()
+redraw rc rs = do
     ss <- gets windowset
 
     let Screen _ _ (SD (Rectangle _ _ s_width s_height)) = current ss
 
-    -- TODO this let is duplicated in newPager
+    -- TODO this let is duplicated in newRhombus
     let scale x = x * cell_w `div` s_width -- TODO use bw
-        cell_w  = pc_cellwidth pc
+        cell_w  = rc_cellwidth rc
         cell_h  = scale s_height
 
         -- txy is the top-left corner of the first (center) cell
@@ -168,25 +168,25 @@ redraw pc ps = do
         dx = fi $ cell_w + 2
         dy = fi $ cell_h + 2
 
-        paint = pc_paint pc
-        xmf   = ps_font ps
-        tags  = ps_strings ps
+        paint = rc_paint rc
+        xmf   = rs_font rs
+        tags  = rs_strings rs
         --currentTag = last tags
 
     withDisplay $ \ d -> do
-        -- XXX we cannot use withPixmapAndGC because pc_paint is an X monad
-        p <- io $ createPixmap d (ps_window ps) s_width s_height (defaultDepthOfScreen $ defaultScreenOfDisplay d)
+        -- XXX we cannot use withPixmapAndGC because rc_paint is an X monad
+        p <- io $ createPixmap d (rs_window rs) s_width s_height (defaultDepthOfScreen $ defaultScreenOfDisplay d)
         g <- io $ createGC d p
 
         -- TODO fixme
         color_black <- stringToPixel d "black"
 
-        forZipWithM_ tags (reachableCoords ps) $ \ tag oxy@(ox, oy) -> do
+        forZipWithM_ tags (reachableCoords rs) $ \ tag oxy@(ox, oy) -> do
 
-            let focus   = oxy == ps_focus ps
-                match   = isXOf (pc_matchmethod pc) (ps_search ps) tag
+            let focus   = oxy == rs_focus rs
+                match   = isXOf (rc_matchmethod rc) (rs_search rs) tag
                 current = tag == last tags
-                (_b_color, _bg_color, _fg_color) = pc_colors pc focus match current
+                (_b_color, _bg_color, _fg_color) = rc_colors rc focus match current
                 --cell_x = (ox * dx) + x - fi (cell_w `div` 2)
                 --cell_y = (oy * dy) + y - fi (cell_h `div` 2)
                 cell_x = (ox * dx) + tx
@@ -212,7 +212,7 @@ redraw pc ps = do
                     coordModePrevious
 
             -- custom draw
-            paint pc ps d p g tag (Rectangle (cell_x + 1) (cell_y + 1) cell_w cell_h) focus match current
+            paint rc rs d p g tag (Rectangle (cell_x + 1) (cell_y + 1) cell_w cell_h) focus match current
 
             -- paint text
             -- TODO custom paint text?
@@ -237,21 +237,21 @@ redraw pc ps = do
 
                     copyArea d f_pm p f_gc 0 0 s_width s_height 0 0
 
-        io $ copyArea d p (ps_window ps) g 0 0 s_width s_height 0 0
+        io $ copyArea d p (rs_window rs) g 0 0 s_width s_height 0 0
         io $ freePixmap d p
         io $ freeGC d g
 
 
-newPager :: PagerConfig -> [String] -> X PagerState
-newPager c tags = do
+newRhombus :: RhombusConfig -> [String] -> X RhombusState
+newRhombus rc tags = do
     ss <- gets windowset
 
     let Screen _ _ (SD (Rectangle _ _ s_width s_height)) = current ss
-        (_, def_win_bg, _) = pc_colors c False True False
+        (_, def_win_bg, _) = rc_colors rc False True False
 
     -- TODO this let is duplicated in redraw
     let scale x = x * cell_w `div` s_width -- TODO use bw
-        cell_w  = pc_cellwidth c
+        cell_w  = rc_cellwidth rc
         cell_h  = scale s_height
 
         -- TODO don't delete this let but use it instead of s_{width,height}
@@ -270,7 +270,7 @@ newPager c tags = do
         dx = fi $ cell_w + 2
         dy = fi $ cell_h + 2
 
-    fn <- initXMF (pc_font c)
+    fn <- initXMF (rc_font rc)
     win <- createNewWindow (Rectangle 0 0 s_width s_height) Nothing def_win_bg True
 
     withDisplay $ \ d ->
@@ -278,11 +278,11 @@ newPager c tags = do
             forZipWithM_ tags wave $ \ _ (ox, oy) ->
                 fillRectangle d p g (tx + ox * dx) (ty + oy * dy) (fi dx) (fi dy)
 
-    return $ PagerState win "" fn (0,0) tags
+    return $ RhombusState win "" fn (0,0) tags
 
 
-removePager :: PagerState -> X ()
-removePager (PagerState w _ fn _ _) = do
+removeRhombus :: RhombusState -> X ()
+removeRhombus (RhombusState w _ fn _ _) = do
     deleteWindow w
     releaseXMF fn
 
@@ -296,14 +296,14 @@ commonPrefix (x:xs) (y:ys) | x == y = x:commonPrefix xs ys
 commonPrefix _ _ = []
 
 
-isXOf :: PagerMatch -> String -> String -> Bool
-isXOf PagerMatchInfix  = isInfixOf
-isXOf PagerMatchPrefix = isPrefixOf
+isXOf :: RhombusMatch -> String -> String -> Bool
+isXOf RhombusMatchInfix  = isInfixOf
+isXOf RhombusMatchPrefix = isPrefixOf
 
 
-findXIndex :: (Eq a) => PagerMatch -> [a] -> [a] -> Maybe Int
-findXIndex PagerMatchInfix  = findInfixIndex
-findXIndex PagerMatchPrefix = findPrefixIndex
+findXIndex :: (Eq a) => RhombusMatch -> [a] -> [a] -> Maybe Int
+findXIndex RhombusMatchInfix  = findInfixIndex
+findXIndex RhombusMatchPrefix = findPrefixIndex
 
 
 findInfixIndex :: (Eq a) => [a] -> [a] -> Maybe Int
