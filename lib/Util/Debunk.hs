@@ -1,4 +1,4 @@
-module Debunk
+module Util.Debunk
     ( printToErrors
     ) where
 

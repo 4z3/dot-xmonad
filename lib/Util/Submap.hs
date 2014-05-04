@@ -1,6 +1,6 @@
 -- This module is based on Jason Creighton's XMonad.Actions.Submap
 
-module Submap
+module Util.Submap
     ( submapString
     ) where
 
