@@ -56,6 +56,13 @@ reachableCoords :: RhombusState -> [(Position, Position)]
 reachableCoords RhombusState{rs_strings=xs} = take (length xs) wave
 
 
+matchingReachableCoords :: RhombusConfig -> RhombusState -> [(Position, Position)]
+matchingReachableCoords rc rs =
+    snd $ unzip
+        $ filter (isXOf (rc_matchmethod rc) (rs_search rs) . fst)
+        $ zip (rs_strings rs) (reachableCoords rs)
+
+
 match :: MatchMethod -> String -> [String] -> Maybe String
 match m s ws = do
     let cands = filter (isXOf m s) ws
@@ -84,15 +91,19 @@ rhombusMode viewFunc rc rs =
         failbeep >> rhombusMode viewFunc rc rs
 
     keys = fromList $
-        [ ((0, xK_BackSpace ), incSearchPopChar rs >>= rhombusMode viewFunc rc)
-        , ((0, xK_Escape    ), removeRhombus rs)
-        , ((0, xK_Menu      ), removeRhombus rs)
-        , ((0, xK_Left      ), goto rc (-1, 0) rs >>= rhombusMode viewFunc rc)
-        , ((0, xK_Right     ), goto rc ( 1, 0) rs >>= rhombusMode viewFunc rc)
-        , ((0, xK_Up        ), goto rc ( 0,-1) rs >>= rhombusMode viewFunc rc)
-        , ((0, xK_Down      ), goto rc ( 0, 1) rs >>= rhombusMode viewFunc rc)
-        , ((0, xK_Return    ), removeRhombus rs >> return (selectFocused rs) >>= viewFunc)
+        [ ((0   , xK_BackSpace  ), incSearchPopChar rs >>= rhombusMode viewFunc rc)
+        , ((0   , xK_Escape     ), removeRhombus rs)
+        , ((0   , xK_Menu       ), removeRhombus rs)
+        , ((0   , xK_Left       ), goto rc (-1, 0) rs >>= rhombusMode viewFunc rc)
+        , ((0   , xK_Right      ), goto rc ( 1, 0) rs >>= rhombusMode viewFunc rc)
+        , ((0   , xK_Up         ), goto rc ( 0,-1) rs >>= rhombusMode viewFunc rc)
+        , ((0   , xK_Down       ), goto rc ( 0, 1) rs >>= rhombusMode viewFunc rc)
+        , ((0   , xK_Tab        ), gotoNextMatch rc rs >>= rhombusMode viewFunc rc)
+        , ((_S  , xK_Tab        ), gotoPrevMatch rc rs >>= rhombusMode viewFunc rc)
+        , ((0   , xK_Return     ), removeRhombus rs >> return (selectFocused rs) >>= viewFunc)
         ]
+
+    _S = shiftMask
 
 
 -- TODO make failbeep configurable
@@ -125,6 +136,28 @@ wrapFocus (dx, 0) rs@RhombusState{rs_focus=focus} = do
     return rs { rs_focus = column `modIndex` (i + fromIntegral dx) }
 
 wrapFocus _ _ = Nothing
+
+
+gotoPrevMatch :: RhombusConfig -> RhombusState -> X RhombusState
+gotoPrevMatch rc rs@RhombusState{rs_focus=focus} = do
+    case reverse (matchingReachableCoords rc rs) of
+        [] -> failbeep >> return rs
+        xs -> return rs
+            { rs_focus = maybe (head xs)
+                               (modIndex xs . (+1))
+                               (focus `elemIndex` xs)
+            }
+
+
+gotoNextMatch :: RhombusConfig -> RhombusState -> X RhombusState
+gotoNextMatch rc rs@RhombusState{rs_focus=focus} = do
+    case matchingReachableCoords rc rs of
+        [] -> failbeep >> return rs
+        xs -> return rs
+            { rs_focus = maybe (head xs)
+                               (modIndex xs . (+1))
+                               (focus `elemIndex` xs)
+            }
 
 
 selectFocused :: RhombusState -> String
