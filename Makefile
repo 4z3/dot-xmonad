@@ -1,6 +1,6 @@
 help:;@grep -v ^help: Makefile
 
-ghcVer := 7.6.3
+ghcVer := 7.8.2
 packageDb := .cabal-sandbox/x86_64-linux-ghc-$(ghcVer)-packages.conf.d
 
 export GHC_PACKAGE_PATH := $(packageDb):/usr/lib/ghc-$(ghcVer)/package.conf.d
