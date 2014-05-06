@@ -29,6 +29,7 @@ data MatchMethod = MatchInfix | MatchPrefix
 data RhombusConfig = RhombusConfig
     { rc_font           :: String
     , rc_cellwidth      :: Dimension
+    , rc_padding        :: Dimension
     , rc_matchmethod    :: MatchMethod
     , rc_wrap           :: Bool
     , rc_colors         :: Bool -> Bool -> Bool -> (String, String, String)
@@ -37,7 +38,7 @@ data RhombusConfig = RhombusConfig
 
 
 -- TODO currently xft is broken
-defaultRhombusConfig = RhombusConfig "xft:Sans-8" 100 MatchInfix True stupidColors noPaint
+defaultRhombusConfig = RhombusConfig "xft:Sans-8" 100 0 MatchInfix True stupidColors noPaint
     where
     stupidColors _ _ _ = ("red", "magenta", "yellow")
     noPaint _ _ _ _ _ _ _ _ _ = return ()
@@ -196,10 +197,11 @@ redraw rc rs = do
         tx = fi $ s_width  `div` 2 - cell_w `div` 2
         ty = fi $ s_height `div` 2 - cell_h `div` 2
 
+        padding = rc_padding rc
+
         -- dxy are the outer cell dimensions (i.e. including the border)
-        -- TODO currently we can only use 2 here...
-        dx = fi $ cell_w + 2
-        dy = fi $ cell_h + 2
+        dx = fi $ cell_w + 2 + padding
+        dy = fi $ cell_h + 2 + padding
 
         paint = rc_paint rc
         xmf   = rs_font rs
@@ -222,8 +224,8 @@ redraw rc rs = do
                 (_b_color, _bg_color, _fg_color) = rc_colors rc focus match current
                 --cell_x = (ox * dx) + x - fi (cell_w `div` 2)
                 --cell_y = (oy * dy) + y - fi (cell_h `div` 2)
-                cell_x = (ox * dx) + tx
-                cell_y = (oy * dy) + ty
+                cell_x = (ox * dx) + tx + 1
+                cell_y = (oy * dy) + ty + 1
 
             b_color <- stringToPixel d _b_color
             bg_color <- stringToPixel d _bg_color
@@ -231,12 +233,12 @@ redraw rc rs = do
 
             -- draw background
             io $ setForeground d g bg_color
-            io $ fillRectangle d p g (cell_x + 1) (cell_y + 1) cell_w cell_h
+            io $ fillRectangle d p g cell_x cell_y cell_w cell_h
 
             -- draw border
             io $ setForeground d g b_color
             io $ drawLines d p g
-                    [ Point cell_x cell_y
+                    [ Point (cell_x - 1) (cell_y - 1)
                     , Point (fi cell_w + 1) 0
                     , Point 0 (fi cell_h + 1)
                     , Point (-(fi cell_w + 1)) 0
@@ -245,7 +247,7 @@ redraw rc rs = do
                     coordModePrevious
 
             -- custom draw
-            paint rc d p g tag (Rectangle (cell_x + 1) (cell_y + 1) cell_w cell_h) focus match current
+            paint rc d p g tag (Rectangle cell_x cell_y cell_w cell_h) focus match current
 
             -- paint text
             -- TODO custom paint text?
@@ -298,10 +300,11 @@ newRhombus rc tags = do
         tx = fi $ s_width  `div` 2 - cell_w `div` 2
         ty = fi $ s_height `div` 2 - cell_h `div` 2
 
+        padding = rc_padding rc
+
         -- dxy are the outer cell dimensions (i.e. including the border)
-        -- TODO currently we can only use 2 here...
-        dx = fi $ cell_w + 2
-        dy = fi $ cell_h + 2
+        dx = fi $ cell_w + 2 + padding
+        dy = fi $ cell_h + 2 + padding
 
     fn <- initXMF (rc_font rc)
     win <- createNewWindow (Rectangle 0 0 s_width s_height) Nothing def_win_bg True
@@ -309,7 +312,7 @@ newRhombus rc tags = do
     withDisplay $ \ d ->
         io $ shapeWindow d win $ \ p g ->
             forZipWithM_ tags wave $ \ _ (ox, oy) ->
-                fillRectangle d p g (tx + ox * dx) (ty + oy * dy) (fi dx) (fi dy)
+                fillRectangle d p g (tx + ox * dx) (ty + oy * dy) (fi cell_w + 2) (fi cell_h + 2)
 
     return $ RhombusState win "" fn (0,0) tags
 
