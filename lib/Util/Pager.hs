@@ -151,15 +151,15 @@ drawMiniWindow d p gc ox oy color s win = do
     bg' <- stringToPixel d bg
 
     setForeground d gc bg'
-    fillRectangle d p gc x y w h
+    fillRectangle d p gc (x + 1) (y + 1) (w - 2) (h - 2)
 
     setForeground d gc fg'
     drawLines d p gc
         [ Point x y
         , Point (fi w - 1) 0
-        , Point 0 (fi h - 1)
+        , Point 0 (fi h - 2)
         , Point (- fi w + 1) 0
-        , Point 0 (- fi h + 1)
+        , Point 0 (- fi h + 2)
         ]
         coordModePrevious
 
