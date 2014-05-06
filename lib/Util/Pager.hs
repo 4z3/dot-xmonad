@@ -20,7 +20,7 @@ import XMonad.Util.Font ( fi, stringToPixel )
 data PagerConfig = PagerConfig
     { pc_font               :: String
     , pc_cellwidth          :: Dimension
-    , pc_padding            :: Dimension
+    , pc_margin             :: Dimension
     , pc_matchmethod        :: MatchMethod
     , pc_wrap               :: Bool
     , pc_workspaceColors    :: Bool -> Bool -> Bool -> (String, String, String)
@@ -36,7 +36,7 @@ pager :: PagerConfig -> (String -> X ()) -> [String] -> X ()
 pager pc = rhombus defaultRhombusConfig
     { rc_font           = pc_font pc
     , rc_cellwidth      = pc_cellwidth pc
-    , rc_padding        = pc_padding pc
+    , rc_margin         = pc_margin pc
     , rc_matchmethod    = pc_matchmethod pc
     , rc_wrap           = pc_wrap pc
     , rc_colors         = pc_workspaceColors pc

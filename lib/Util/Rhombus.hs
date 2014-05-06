@@ -29,7 +29,7 @@ data MatchMethod = MatchInfix | MatchPrefix
 data RhombusConfig = RhombusConfig
     { rc_font           :: String
     , rc_cellwidth      :: Dimension
-    , rc_padding        :: Dimension
+    , rc_margin         :: Dimension
     , rc_matchmethod    :: MatchMethod
     , rc_wrap           :: Bool
     , rc_colors         :: Bool -> Bool -> Bool -> (String, String, String)
@@ -197,11 +197,11 @@ redraw rc rs = do
         tx = fi $ s_width  `div` 2 - cell_w `div` 2
         ty = fi $ s_height `div` 2 - cell_h `div` 2
 
-        padding = rc_padding rc
+        margin = rc_margin rc
 
         -- dxy are the outer cell dimensions (i.e. including the border)
-        dx = fi $ cell_w + 2 + padding
-        dy = fi $ cell_h + 2 + padding
+        dx = fi $ cell_w + 2 + margin
+        dy = fi $ cell_h + 2 + margin
 
         paint = rc_paint rc
         xmf   = rs_font rs
@@ -300,11 +300,11 @@ newRhombus rc tags = do
         tx = fi $ s_width  `div` 2 - cell_w `div` 2
         ty = fi $ s_height `div` 2 - cell_h `div` 2
 
-        padding = rc_padding rc
+        margin = rc_margin rc
 
         -- dxy are the outer cell dimensions (i.e. including the border)
-        dx = fi $ cell_w + 2 + padding
-        dy = fi $ cell_h + 2 + padding
+        dx = fi $ cell_w + 2 + margin
+        dy = fi $ cell_h + 2 + margin
 
     fn <- initXMF (rc_font rc)
     win <- createNewWindow (Rectangle 0 0 s_width s_height) Nothing def_win_bg True
